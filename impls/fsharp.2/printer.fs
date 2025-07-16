@@ -39,7 +39,8 @@ and prStr (m: MalType): string =
         string n
     | MalString s ->
         sprintf "\"%s\"" s
-    | MalSymbol s ->
+    | MalSymbol s
+    | MalKeyword s ->
         s
     | MalBool b ->
         let s = string b

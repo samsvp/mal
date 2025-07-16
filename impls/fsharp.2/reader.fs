@@ -11,6 +11,7 @@ type MalType =
     | MalNumber of float
     | MalString of string
     | MalSymbol of string
+    | MalKeyword of string
     | MalBool of bool
     | MalNil
     | MalList of MalType array
@@ -86,6 +87,8 @@ let tokenize s =
                 ERROR "EOF Unclosed string"
         | ';' ->
             s.[1..s.Length-1] |> COMMENT
+        | ':' ->
+            KEYWORD s
         | _ ->
             let success, f = System.Double.TryParse s
             if success then
@@ -108,6 +111,7 @@ let readAtom r: MalType =
     | Some (BOOL b) -> MalBool b
     | Some (STRING s) -> MalString s
     | Some (SYMBOL s) -> MalSymbol s
+    | Some (KEYWORD s) -> MalKeyword s
     | Some (NUMBER n) -> MalNumber n
     | Some (ERROR e) ->
         MalError "EOF"
@@ -147,7 +151,7 @@ let rec readCollection r acc cType =
         let r, value = readForm r
         readCollection r (value :: acc) cType
     | _, None ->
-        r, MalError "EOF"
+        r, MalError "EOF unclosed bracket"
 
 and readVec r acc =
     readCollection r acc C_VECTOR
