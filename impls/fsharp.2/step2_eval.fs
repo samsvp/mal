@@ -18,6 +18,13 @@ let read (s: string): MalType =
     readStr s
 
 let rec eval (env: Dictionary<string, MalFunction>) (ast: MalType): MalType =
+    let isDebug =
+        let v = Environment.GetEnvironmentVariable "DEBUG_EVAL"
+        v <> "nil" && v <> "false"
+    if isDebug then
+        prStr ast
+        |> printfn "%s"
+
     match ast with
     | MalSymbol s ->
         let success = env.ContainsKey s
