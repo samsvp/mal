@@ -7,7 +7,7 @@ let rec prCollection arr cType =
         match cType with
         | C_VECTOR ->  "[", "]"
         | C_LIST -> "(", ")"
-        | C_HASH_MAP -> "{", "}"
+        | _ -> failwith "Unsupported collection"
     let s =
         arr
         |> Array.fold (fun acc m ->
@@ -18,6 +18,20 @@ let rec prCollection arr cType =
 
         ) openChar
     s + closeChar
+
+and prHashMap m =
+    let openChar = "{"
+    let closeChar = "}"
+    let s =
+        m
+        |> Map.fold (fun acc key v ->
+            if acc <> openChar then
+                sprintf "%s %s %s" acc (prStr key) (prStr v)
+            else
+                sprintf "%s%s %s" acc (prStr key) (prStr v)
+        ) openChar
+    s + closeChar
+
 
 and prStr (m: MalType): string =
     match m with
@@ -38,5 +52,5 @@ and prStr (m: MalType): string =
         prCollection arr C_LIST
     | MalVector arr ->
         prCollection arr C_VECTOR
-    | MalHashMap arr ->
-        prCollection arr C_HASH_MAP
+    | MalHashMap m ->
+        prHashMap m

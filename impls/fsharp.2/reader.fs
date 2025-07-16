@@ -15,7 +15,7 @@ type MalType =
     | MalNil
     | MalList of MalType array
     | MalVector of MalType array
-    | MalHashMap of MalType array
+    | MalHashMap of Map<MalType, MalType>
     | MalError of string
 
 type Token =
@@ -128,9 +128,20 @@ let rec readCollection r acc cType =
             |> List.toArray
             |> fun value ->
                 match cType with
-                | C_VECTOR -> MalVector value
-                | C_LIST -> MalList value
-                | C_HASH_MAP -> MalHashMap value
+                | C_VECTOR ->
+                    MalVector value
+                | C_LIST ->
+                    MalList value
+                | C_HASH_MAP ->
+                    if value.Length % 2 <> 0 then
+                        MalError "EOF hash map must have an even number of elements"
+                    else
+
+                    value
+                    |> Array.chunkBySize 2
+                    |> Array.map (fun vs -> vs.[0], vs.[1])
+                    |> Map.ofArray
+                    |> MalHashMap
         next r, value
     | _, Some _ ->
         let r, value = readForm r
