@@ -1,5 +1,6 @@
 open System
 
+open Types
 open Reader
 open Printer
 

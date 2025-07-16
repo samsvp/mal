@@ -1,6 +1,6 @@
 module Functions
 
-open Reader
+open Types
 
 let add (xs: MalType list): MalType =
     match xs with
@@ -37,7 +37,7 @@ let add (xs: MalType list): MalType =
         |> List.fold(fun acc n ->
             match acc, n with
             | MalList acc, MalList n ->
-                Array.concat [acc; n] |> MalList
+                acc @ n |> MalList
             | MalError _, _ ->
                 acc
             | _ ->

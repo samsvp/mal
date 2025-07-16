@@ -1,5 +1,6 @@
 module Printer
 
+open Types
 open Reader
 
 let rec prCollection arr cType =
@@ -10,7 +11,7 @@ let rec prCollection arr cType =
         | _ -> failwith "Unsupported collection"
     let s =
         arr
-        |> Array.fold (fun acc m ->
+        |> Seq.fold (fun acc m ->
             if acc <> openChar then
                 sprintf "%s %s" acc (prStr m)
             else

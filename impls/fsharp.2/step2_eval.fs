@@ -1,5 +1,6 @@
 open System
 
+open Types
 open Reader
 open Printer
 open Functions
@@ -11,22 +12,43 @@ let env =
         "-", subtract
         "/", divide
         "*", multiply
-    ] |> Dictionary<string, MalFunction>
+    ] |> Dictionary<MalSymbol, MalFunction>
 
 let read (s: string): MalType =
     readStr s
 
-let eval (env: Dictionary<string, MalFunction>) (ast: MalType): MalType =
-    let rec eval env acc fn ast =
-        match ast with
+let rec eval (env: Dictionary<string, MalFunction>) (ast: MalType): MalType =
+    match ast with
+    | MalSymbol s ->
+        let success = env.ContainsKey s
+        if not success then
+            sprintf "Could not find symbol %s" s
+            |> MalError
+        else
+            ast
+    | MalList (x :: xs) ->
+        let value = eval env x
+        match value with
+        | MalError _ ->
+            value
         | MalSymbol s ->
-            let success, fn = Dictionary.TryGetValue s
-            if not success then
-                sprintf "Could not find symbol %s" s
-                |> MalError
-            else
-                s
-        | MalList xs -> xs
+            let fn = env.[s]
+            xs
+            |> List.map (eval env)
+            |> fn
+        | _ ->
+            sprintf "Error: %A used as function name" value
+            |> MalError
+    | MalVector vs ->
+        vs
+        |> Array.map (eval env)
+        |> MalVector
+    | MalHashMap hs ->
+        hs
+        |> Map.map (fun _ v -> eval env v)
+        |> MalHashMap
+    | _ ->
+        ast
 
 
 let print (m: MalType): string =

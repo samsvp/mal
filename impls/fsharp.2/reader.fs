@@ -1,25 +1,7 @@
 module Reader
 
 open System.Text.RegularExpressions
-
-type CollectionTypes =
-    | C_LIST
-    | C_VECTOR
-    | C_HASH_MAP
-
-type MalType =
-    | MalNumber of float
-    | MalString of string
-    | MalSymbol of string
-    | MalKeyword of string
-    | MalBool of bool
-    | MalNil
-    | MalList of MalType array
-    | MalVector of MalType array
-    | MalHashMap of Map<MalType, MalType>
-    | MalError of string
-
-type MalFunction = MalType list -> MalType
+open Types
 
 type Token =
     | EOF
@@ -131,11 +113,12 @@ let rec readCollection r acc cType =
         let value =
             acc
             |> List.rev
-            |> List.toArray
             |> fun value ->
                 match cType with
                 | C_VECTOR ->
-                    MalVector value
+                    value
+                    |> List.toArray
+                    |> MalVector
                 | C_LIST ->
                     MalList value
                 | C_HASH_MAP ->
@@ -144,9 +127,9 @@ let rec readCollection r acc cType =
                     else
 
                     value
-                    |> Array.chunkBySize 2
-                    |> Array.map (fun vs -> vs.[0], vs.[1])
-                    |> Map.ofArray
+                    |> List.chunkBySize 2
+                    |> List.map (fun vs -> vs.[0], vs.[1])
+                    |> Map.ofList
                     |> MalHashMap
         next r, value
     | _, Some _ ->
