@@ -73,9 +73,17 @@ let tokenize s =
         match s.[0] with
         | '"' ->
             if s.Length > 1 && s.[s.Length-1] = '"' then
-                s.[1..s.Length-2] |> STRING
+                let mutable i = s.Length - 2
+                let mutable backslashAmount = 0
+                while i <> 0 && s.[i] = '\\' do
+                    backslashAmount <- backslashAmount + 1
+                    i <- i - 1
+                if backslashAmount % 2 = 0 then
+                    s.[1..s.Length-2] |> STRING
+                else
+                    ERROR "EOF Unclosed string"
             else
-                ERROR "Unclosed string"
+                ERROR "EOF Unclosed string"
         | ';' ->
             s.[1..s.Length-1] |> COMMENT
         | _ ->
