@@ -1,15 +1,17 @@
 open System
 
 open Reader
+open Printer
 
-let read (s: string): string =
+let read (s: string): MalType =
+    let m = readStr s
+    m
+
+let eval (s: MalType): MalType =
     s
 
-let eval (s: string): string =
-    s
-
-let print (s: string): string =
-    s
+let print (m: MalType): string =
+    prStr m
 
 let rep (s: string): string =
     s
@@ -25,6 +27,6 @@ let rec main args =
         0
     else
         line
-        |> tokenize
-        |> printfn "%A"
+        |> rep
+        |> printfn "%s"
         main args
