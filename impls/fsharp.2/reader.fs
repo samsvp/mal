@@ -19,6 +19,8 @@ type MalType =
     | MalHashMap of Map<MalType, MalType>
     | MalError of string
 
+type MalFunction = MalType list -> MalType
+
 type Token =
     | EOF
     | PAREN_OPEN

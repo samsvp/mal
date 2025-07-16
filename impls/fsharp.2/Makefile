@@ -2,7 +2,7 @@
 
 DEBUG =
 
-SOURCES_BASE = reader.fs printer.fs #types.fs error.fs node.fs tokenizer.fs \
+SOURCES_BASE = reader.fs printer.fs functions.fs #types.fs error.fs node.fs tokenizer.fs \
 	       readline.fs
 SOURCES_LISP = core.fs #env.fs stepA_mal.fs
 SOURCES = $(SOURCES_BASE) $(SOURCES_LISP)

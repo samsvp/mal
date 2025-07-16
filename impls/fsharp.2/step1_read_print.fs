@@ -4,8 +4,7 @@ open Reader
 open Printer
 
 let read (s: string): MalType =
-    let m = readStr s
-    m
+    readStr s
 
 let eval (s: MalType): MalType =
     s
