@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
-use crate::types::MalType;
+use crate::types::{MalHashable, MalType};
 
-fn print_map(m: HashMap<MalType, MalType>) -> String {
+fn print_map(m: HashMap<MalHashable, MalType>) -> String {
     let mut s = String::from("{");
     s.push_str(
         &m
             .iter()
             .map(|(key, value)| {
-                let key_str = pr_str(key.clone());
+                let key_str = pr_str(key.to_mal_type());
                 let val_str = pr_str(value.clone());
                 format!("{key_str} {val_str}")
             })
@@ -39,7 +39,6 @@ fn print_vec(
 pub fn pr_str(var: MalType) -> String {
     match var {
         MalType::String(s) => s,
-        MalType::At => "@".to_string(),
         MalType::Nil => "nil".to_string(),
         MalType::Int(i) => i.to_string(),
         MalType::Bool(b) => b.to_string(),

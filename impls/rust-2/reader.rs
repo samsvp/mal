@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use regex::Regex;
 use once_cell::sync::Lazy;
 
-use crate::types::MalType;
+use crate::types::{MalHashable, MalType, HashableConvertError};
 
 enum ColType {
     List,
@@ -38,7 +38,6 @@ impl Reader {
 
 fn read_atom(token: &str) -> MalType {
     match token {
-        "@" => MalType::At,
         "nil" => MalType::Nil,
         "false" => MalType::Bool(false),
         "true" => MalType::Bool(true),
@@ -48,6 +47,23 @@ fn read_atom(token: &str) -> MalType {
                 return MalType::Int(i);
             }
 
+            let chars = token.as_bytes();
+            if chars[0] == b'"' {
+                if token.len() < 2 || chars[chars.len() - 1] != b'"' {
+                    return MalType::Error("EOF unclosed string.".to_string());
+                }
+
+                let mut backslash_amount = 0;
+                let mut i = chars.len() - 2;
+                while i != 0 && chars[i] == b'\\' {
+                    i -= 1;
+                    backslash_amount += 1;
+                }
+                if backslash_amount % 2 != 0 {
+                    return MalType::Error("EOF unclosed string.".to_string());
+                }
+                return MalType::String(token.to_string());
+            };
             MalType::Symbol(token.to_string())
         },
     }
@@ -61,9 +77,21 @@ fn read_dict(reader: &mut Reader) -> MalType {
                 if acc.len() % 2 != 0 {
                     return MalType::Error("Hash map needs an even number of elements".to_string());
                 }
-                let v: HashMap<MalType, MalType> =
-                    acc.chunks(2).map(|chunk| (chunk[0].clone(), chunk[1].clone())).collect();
-                MalType::Dict(v)
+
+                let result: Result<HashMap<_,_>, HashableConvertError> = acc
+                    .chunks(2)
+                    .try_fold(HashMap::with_capacity(acc.len()/2), |mut map, chunk| {
+                        let key = chunk[0].clone();
+                        let value = chunk[1].clone();
+                        let hashable_key = MalHashable::to_hashable(key)?;
+                        map.insert(hashable_key, value);
+                        Ok(map)
+                    });
+
+                match result {
+                    Ok(map) => MalType::Dict(map),
+                    Err(e) => MalType::Error(e.to_string()),
+                }
             },
             Some(_) => {
                 let v = read_form(reader);
