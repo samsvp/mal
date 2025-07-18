@@ -3,6 +3,11 @@ use once_cell::sync::Lazy;
 
 use crate::types::MalType;
 
+enum ColType {
+    List,
+    Vec,
+}
+
 static RE: Lazy<Regex> = Lazy::new(
     || Regex::new(r##"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)"##).unwrap()
 );
@@ -13,8 +18,11 @@ struct Reader {
 }
 
 impl Reader {
-    pub fn peek(self: &Self) -> &str {
-        &self.tokens[self.pos]
+    pub fn peek(self: &Self) -> Option<&str> {
+        if self.pos >= self.tokens.len() {
+            return None;
+        }
+        Some(&self.tokens[self.pos])
     }
 
     pub fn next(self: &mut Self) -> Option<&str> {
@@ -38,27 +46,68 @@ fn read_atom(token: &str) -> MalType {
                 return MalType::Int(i);
             }
 
-            MalType::Symbom(token.to_string())
+            MalType::Symbol(token.to_string())
         },
     }
 }
 
-fn read_list(reader: &mut Reader) -> MalType {
+fn read_dict(reader: &mut Reader) -> MalType {
     fn parse(reader: &mut Reader, acc: &mut Vec<MalType>) -> MalType {
         match reader.peek() {
-            ")" => {
+            Some("{") => {
                 reader.next();
-                MalType::List(acc.to_vec())
+                if acc.len() % 2 != 0 {
+                    return MalType::Error("Hash map needs an even number of elements".to_string());
+                }
+                MalType::Dict(
+                    acc.chunks(2).map(|chunk| (chunk[0].clone(), chunk[1].clone())).collect()
+                )
             },
-            _ => {
+            Some(_) => {
                 let v = read_form(reader);
                 acc.push(v);
                 parse(reader, acc)
-            }
+            },
+            None => MalType::Error("EOF unmatched '}'".to_string())
+        }
+    }
+    parse(reader, &mut vec![])
+}
+
+fn read_collection(reader: &mut Reader, col_type: ColType) -> MalType {
+    fn parse(reader: &mut Reader, col_type: ColType, acc: &mut Vec<MalType>) -> MalType {
+        let close = match col_type {
+            ColType::List => ")",
+            ColType::Vec => "]",
+        };
+
+        match reader.peek() {
+            Some(char) if char == close => {
+                reader.next();
+                match col_type {
+                    ColType::Vec => MalType::Vector(acc.to_vec()),
+                    ColType::List => MalType::List(acc.to_vec()),
+                }
+            },
+            Some(_) => {
+                let v = read_form(reader);
+                acc.push(v);
+                parse(reader, col_type, acc)
+            },
+            None => MalType::Error(format!("EOF unmatched '{close}'"))
         }
 
     }
-    parse(reader, &mut vec![])
+    parse(reader, col_type, &mut vec![])
+}
+
+
+fn read_vec(reader: &mut Reader) -> MalType {
+    read_collection(reader, ColType::Vec)
+}
+
+fn read_list(reader: &mut Reader) -> MalType {
+    read_collection(reader, ColType::List)
 }
 
 fn read_form(reader: &mut Reader) -> MalType {
@@ -68,6 +117,8 @@ fn read_form(reader: &mut Reader) -> MalType {
 
     match token {
         "(" => read_list(reader),
+        "[" => read_vec(reader),
+        "{" => read_dict(reader),
         token => read_atom(token)
     }
 }

@@ -4,8 +4,11 @@ pub enum MalType {
     Nil,
     Bool(bool),
     Int(i64),
-    Symbom(String),
+    Symbol(String),
     KeyWord(String),
     String(String),
+    Error(String),
     List(Vec<MalType>),
+    Dict(Vec<(MalType, MalType)>),
+    Vector(Vec<MalType>),
 }
