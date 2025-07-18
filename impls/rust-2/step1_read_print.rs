@@ -1,22 +1,24 @@
 mod reader;
 mod printer;
+mod types;
 
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
+use types::MalType;
 
-fn read(val: &str) -> Vec<String> {
+fn read(val: &str) -> MalType {
     reader::read_str(val)
 }
 
-fn eval(val: Vec<String>) -> Vec<String> {
+fn eval(val: MalType) -> MalType {
     val
 }
 
-fn print(val: Vec<String>) -> Vec<String> {
+fn print(val: MalType) -> MalType {
     val
 }
 
-fn rep(val: &str) -> Vec<String> {
+fn rep(val: &str) -> MalType {
     print(eval(read(val)))
 }
 
