@@ -27,3 +27,4 @@ zig-cache/
 *.exe
 *.json
 *.dll
+target/
