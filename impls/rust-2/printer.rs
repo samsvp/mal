@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use crate::types::MalType;
 
-fn print_map(m: Vec<(MalType, MalType)>) -> String {
+fn print_map(m: HashMap<MalType, MalType>) -> String {
     let mut s = String::from("{");
     s.push_str(
         &m

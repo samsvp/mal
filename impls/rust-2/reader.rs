@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use regex::Regex;
 use once_cell::sync::Lazy;
 
@@ -59,9 +61,9 @@ fn read_dict(reader: &mut Reader) -> MalType {
                 if acc.len() % 2 != 0 {
                     return MalType::Error("Hash map needs an even number of elements".to_string());
                 }
-                MalType::Dict(
-                    acc.chunks(2).map(|chunk| (chunk[0].clone(), chunk[1].clone())).collect()
-                )
+                let v: HashMap<MalType, MalType> =
+                    acc.chunks(2).map(|chunk| (chunk[0].clone(), chunk[1].clone())).collect();
+                MalType::Dict(v)
             },
             Some(_) => {
                 let v = read_form(reader);
