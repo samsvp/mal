@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use regex::Regex;
 use once_cell::sync::Lazy;
 
-use crate::{env::Env, types::{HashableConvertError, MalFn, MalHashable, MalType}};
+use crate::types::{HashableConvertError, MalFn, MalHashable, MalType};
 
 static RE: Lazy<Regex> = Lazy::new(
     || Regex::new(r##"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)"##).unwrap()

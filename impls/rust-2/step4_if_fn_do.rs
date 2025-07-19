@@ -1,13 +1,13 @@
 mod reader;
 mod printer;
 mod types;
-mod functions;
+mod core;
 mod env;
 
 use std::collections::HashMap;
 
 use env::Env;
-use functions::get_env;
+use core::get_env;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
 use types::{MalHashable, MalType, MalFn};
@@ -109,15 +109,7 @@ fn fn_star(fn_: MalFn, args: Vec<MalType>, env: &Env) -> MalType {
         let value = eval(args[i].clone(), &mut arg_env);
         fn_env.set(fn_.args[i].clone(), value);
     }
-    let ret = eval(*fn_.body, &mut fn_env);
-    match ret {
-        MalType::Fn(fn_) => {
-            let new_fn_env = Env::new(Some(&fn_env));
-            let fn_ = MalFn {env: Some(new_fn_env), ..fn_};
-            return MalType::Fn(fn_);
-        }
-        _ => ret,
-    }
+    eval(*fn_.body, &mut fn_env)
 }
 
 static KEYWORDS: phf::Map<&'static str, fn(&Vec<MalType>, &mut Env) -> MalType> = phf::phf_map!{
@@ -182,6 +174,14 @@ fn eval(val: MalType, env: &mut Env) -> MalType {
         MalType::Dict(ds) => {
             let values: HashMap<MalHashable, MalType> = ds.into_iter().map(|(key, x)| (key, eval(x, env))).collect();
             MalType::Dict(values)
+        }
+        MalType::Fn(fn_) => {
+            let fn_ = if fn_.env.is_none() {
+                MalFn { env: Some(env.clone()), ..fn_ }
+            } else {
+                fn_
+            };
+            MalType::Fn(fn_)
         }
         _ => val
     }
