@@ -38,7 +38,7 @@ fn print_vec(
 
 pub fn pr_str(var: MalType) -> String {
     match var {
-        MalType::String(s) => s,
+        MalType::String(s) => format!("\"{s}\""),
         MalType::Nil => "nil".to_string(),
         MalType::Int(i) => i.to_string(),
         MalType::Bool(b) => b.to_string(),
@@ -48,5 +48,6 @@ pub fn pr_str(var: MalType) -> String {
         MalType::Symbol(s) => s,
         MalType::KeyWord(s) => s,
         MalType::Error(s) => s,
+        MalType::Function(_) => "#<function>".to_string(),
     }
 }

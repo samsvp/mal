@@ -1,6 +1,17 @@
 use std::fmt;
 use std::collections::HashMap;
 
+pub type MalFunction = fn (Vec<MalType>) -> MalType;
+
+static INVALID_ARGUMENT: &str = "Invalid argument";
+static DIVISION_BY_ZERO: &str = "Division by zero";
+pub fn invalid_argument_error() -> MalType {
+    MalType::Error(INVALID_ARGUMENT.to_string())
+}
+pub fn division_by_zero_error() -> MalType {
+    MalType::Error(DIVISION_BY_ZERO.to_string())
+}
+
 #[derive(Debug,Clone)]
 pub enum MalType {
     Nil,
@@ -13,6 +24,7 @@ pub enum MalType {
     List(Vec<MalType>),
     Dict(HashMap<MalHashable, MalType>),
     Vector(Vec<MalType>),
+    Function(MalFunction),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

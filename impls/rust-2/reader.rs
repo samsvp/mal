@@ -5,14 +5,14 @@ use once_cell::sync::Lazy;
 
 use crate::types::{MalHashable, MalType, HashableConvertError};
 
+static RE: Lazy<Regex> = Lazy::new(
+    || Regex::new(r##"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)"##).unwrap()
+);
+
 enum ColType {
     List,
     Vec,
 }
-
-static RE: Lazy<Regex> = Lazy::new(
-    || Regex::new(r##"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)"##).unwrap()
-);
 
 struct Reader {
     tokens: Vec<String>,
@@ -62,7 +62,7 @@ fn read_atom(token: &str) -> MalType {
                 if backslash_amount % 2 != 0 {
                     return MalType::Error("EOF unclosed string.".to_string());
                 }
-                return MalType::String(token.to_string());
+                return MalType::String(token[1..token.len()-1].to_string());
             };
             MalType::Symbol(token.to_string())
         },
@@ -72,7 +72,7 @@ fn read_atom(token: &str) -> MalType {
 fn read_dict(reader: &mut Reader) -> MalType {
     fn parse(reader: &mut Reader, acc: &mut Vec<MalType>) -> MalType {
         match reader.peek() {
-            Some("{") => {
+            Some("}") => {
                 reader.next();
                 if acc.len() % 2 != 0 {
                     return MalType::Error("Hash map needs an even number of elements".to_string());

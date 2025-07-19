@@ -19,7 +19,7 @@ all: $(STEPS)
 $(STEPS): $(EXEC_DIR)/%: %.rs
 	cargo build --release --bin $*
 
-$(STEP1-2) $(STEP3) $(UPPER_STEPS): types.rs reader.rs printer.rs
+$(STEP1-2) $(STEP3) $(UPPER_STEPS): types.rs reader.rs printer.rs functions.rs
 $(STEP3) $(UPPER_STEPS): env.rs
 $(UPPER_STEPS): core.rs
 
