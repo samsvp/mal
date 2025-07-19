@@ -11,6 +11,11 @@ pub fn invalid_argument_error() -> MalType {
 pub fn division_by_zero_error() -> MalType {
     MalType::Error(DIVISION_BY_ZERO.to_string())
 }
+pub fn invalid_parameter_length_error(got: usize, expected: usize) -> MalType {
+    MalType::Error(
+        format!("Invalid parameter length: got {got}, expected {expected}.")
+    )
+}
 
 #[derive(Debug,Clone)]
 pub enum MalType {

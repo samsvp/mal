@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::types::{self, MalType};
+use crate::env::Env;
 
 macro_rules! do_op {
     ($args: expr, MalType::$variant:ident, $init:expr, $fold_op:expr) => {{
@@ -99,12 +100,12 @@ fn div(args: Vec<MalType>) -> MalType {
     }
 }
 
-pub fn get_env() -> HashMap<String, MalType> {
+pub fn get_env() -> Env<'static> {
     let env: HashMap<String, MalType> = HashMap::from([
         ("+".to_string(), MalType::Function(add)),
         ("-".to_string(), MalType::Function(sub)),
         ("*".to_string(), MalType::Function(mult)),
         ("/".to_string(), MalType::Function(div)),
     ]);
-    env
+    Env::from(env)
 }
