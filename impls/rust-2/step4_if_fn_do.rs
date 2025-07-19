@@ -10,13 +10,9 @@ use env::Env;
 use functions::get_env;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
-use types::{MalHashable, MalType};
+use types::{MalHashable, MalType, MalFn};
 
 use crate::printer::pr_str;
-
-fn read(val: &str) -> MalType {
-    reader::read_str(val)
-}
 
 fn def_bang(args: &Vec<MalType>, env: &mut Env) -> MalType {
     if args.len() != 3 {
@@ -69,10 +65,71 @@ fn let_star(args: &Vec<MalType>, env: &mut Env) -> MalType {
     }
 }
 
+fn do_(args: &Vec<MalType>, env: &mut Env) -> MalType {
+    if args.len() == 1 {
+        return types::invalid_parameter_length_error(args.len(), 2);
+    }
+
+    args[1..].iter().map(|x| eval(x.clone(), env)).collect::<Vec<MalType>>().last().cloned().unwrap()
+}
+
+fn if_(args: &Vec<MalType>, env: &mut Env) -> MalType {
+    if args.len() != 3 && args.len() != 4 {
+        if args.len() < 3 {
+            return types::invalid_parameter_length_error(args.len(), 3);
+        } else {
+            return types::invalid_parameter_length_error(args.len(), 4);
+        }
+    }
+
+    match eval(args[1].clone(), env) {
+        MalType::Nil | MalType::Bool(false) => {
+            if args.len() == 3 {
+                return MalType::Nil;
+            }
+            eval(args[3].clone(), env)
+        },
+        _ => eval(args[2].clone(), env)
+    }
+}
+
+fn fn_star(fn_: MalFn, args: Vec<MalType>, env: &Env) -> MalType {
+    if fn_.args.len() != args.len() {
+        return types::invalid_parameter_length_error(args.len() - 1, fn_.args.len());
+    }
+
+    let mut fn_env = if let Some(env) = fn_.env.clone() {
+        env
+    } else {
+        Env::new(Some(env))
+    };
+
+    for i in 0..args.len() {
+        let mut arg_env = Env::new(Some(&fn_env.clone()));
+        let value = eval(args[i].clone(), &mut arg_env);
+        fn_env.set(fn_.args[i].clone(), value);
+    }
+    let ret = eval(*fn_.body, &mut fn_env);
+    match ret {
+        MalType::Fn(fn_) => {
+            let new_fn_env = Env::new(Some(&fn_env));
+            let fn_ = MalFn {env: Some(new_fn_env), ..fn_};
+            return MalType::Fn(fn_);
+        }
+        _ => ret,
+    }
+}
+
 static KEYWORDS: phf::Map<&'static str, fn(&Vec<MalType>, &mut Env) -> MalType> = phf::phf_map!{
     "def!" => def_bang,
     "let*" => let_star,
+    "do" => do_,
+    "if" => if_,
 };
+
+fn read(val: &str) -> MalType {
+    reader::read_str(val)
+}
 
 fn eval(val: MalType, env: &mut Env) -> MalType {
     match val {
@@ -90,15 +147,26 @@ fn eval(val: MalType, env: &mut Env) -> MalType {
             let op = eval(xs[0].clone(), env);
             match op {
                 MalType::Function(fun) => {
-                    let values: Vec<MalType> = xs.iter().map(|x| eval(x.clone(), env)).collect();
-                    if values.len() > 1 {
-                        fun(values[1..].to_vec())
+                    if xs.len() > 1 {
+                        let values: Vec<MalType> = xs[1..].iter().map(|x| eval(x.clone(), env)).collect();
+                        fun(values)
                     } else {
                         fun(vec![])
                     }
                 },
                 MalType::Symbol(s) if KEYWORDS.contains_key(&s) => {
                     KEYWORDS.get(&s).unwrap()(&xs, env)
+                },
+                MalType::Fn(fn_) => {
+                    if xs.len() == 1 {
+                        if fn_.args.len() != 0 {
+                            return MalType::Fn(fn_);
+                        } else {
+                            return fn_star(fn_, vec![], env);
+                        }
+                    }
+
+                    fn_star(fn_, xs[1..].to_vec(), env)
                 },
                 MalType::Error(e) => MalType::Error(e),
                 _ => {

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use regex::Regex;
 use once_cell::sync::Lazy;
 
-use crate::types::{MalHashable, MalType, HashableConvertError};
+use crate::{env::Env, types::{HashableConvertError, MalFn, MalHashable, MalType}};
 
 static RE: Lazy<Regex> = Lazy::new(
     || Regex::new(r##"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)"##).unwrap()
@@ -140,13 +140,53 @@ fn read_list(reader: &mut Reader) -> MalType {
     read_collection(reader, ColType::List)
 }
 
+fn read_fn(reader: &mut Reader) -> MalType {
+    let args_result =
+        match read_form(reader) {
+            MalType::List(args) => {
+                args.iter().try_fold(Vec::with_capacity(args.len()), |mut acc, x|
+                    match x {
+                        MalType::Symbol(s) => {
+                            acc.push(s.to_string());
+                            Ok(acc)
+                        },
+                        MalType::Error(e) => Err(MalType::Error(e.to_string())),
+                        _ => Err(MalType::Error("Function parameters must be symbols.".to_string())),
+                    })
+            },
+            _ => Err(MalType::Error("Function arguments must list.".to_string())),
+        };
+
+    match read_form(reader) {
+        MalType::Error(err) => MalType::Error(err),
+        body => {
+            match args_result {
+                Ok(args) => {
+                    reader.next();
+                    MalType::Fn(MalFn {args, body: Box::new(body), env: None})
+                },
+                Err(err) => err,
+            }
+        }
+    }
+}
+
 fn read_form(reader: &mut Reader) -> MalType {
     let Some(token) = reader.next() else {
         return MalType::Nil;
     };
 
     match token {
-        "(" => read_list(reader),
+        "(" => {
+            match reader.peek() {
+                Some("fn*") => {
+                    reader.next();
+                    read_fn(reader)
+                },
+                Some(_) => read_list(reader),
+                _ => MalType::Error("EOF unmatched ')'".to_string()),
+            }
+        },
         "[" => read_vec(reader),
         "{" => read_dict(reader),
         token => read_atom(token)

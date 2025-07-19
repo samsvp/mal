@@ -24,7 +24,7 @@ fn add(args: Vec<MalType>) -> MalType {
         return MalType::Error("Sum on empty list".to_string());
     }
 
-    match args[0] {
+    match &args[0] {
         MalType::Int(_) => {
             do_op!(args, MalType::Int, 0, |acc, v| acc + v)
         }
@@ -37,7 +37,7 @@ fn add(args: Vec<MalType>) -> MalType {
         MalType::Vector(_) => {
             do_op!(args, MalType::Vector, Vec::new(), |acc, v: &Vec<MalType>| [acc, v.clone()].concat())
         }
-        _ => MalType::Error("Unsupported type for '+'".to_string())
+        t => MalType::Error(format!("Unsupported type for '+': {t:#?}"))
     }
 }
 
@@ -100,7 +100,7 @@ fn div(args: Vec<MalType>) -> MalType {
     }
 }
 
-pub fn get_env() -> Env<'static> {
+pub fn get_env() -> Env {
     let env: HashMap<String, MalType> = HashMap::from([
         ("+".to_string(), MalType::Function(add)),
         ("-".to_string(), MalType::Function(sub)),

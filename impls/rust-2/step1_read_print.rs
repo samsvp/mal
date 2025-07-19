@@ -1,6 +1,7 @@
 mod reader;
 mod printer;
 mod types;
+mod env;
 
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};

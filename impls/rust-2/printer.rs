@@ -49,5 +49,6 @@ pub fn pr_str(var: MalType) -> String {
         MalType::KeyWord(s) => s,
         MalType::Error(s) => s,
         MalType::Function(_) => "#<function>".to_string(),
+        MalType::Fn(fn_) => format!("#<function> args: {:#?}; body: {:#?}; env: {:#?}", fn_.args, fn_.body, fn_.env),
     }
 }

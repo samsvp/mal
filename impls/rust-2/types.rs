@@ -1,5 +1,6 @@
 use std::fmt;
 use std::collections::HashMap;
+use crate::env::Env;
 
 pub type MalFunction = fn (Vec<MalType>) -> MalType;
 
@@ -18,6 +19,13 @@ pub fn invalid_parameter_length_error(got: usize, expected: usize) -> MalType {
 }
 
 #[derive(Debug,Clone)]
+pub struct MalFn {
+    pub args: Vec<String>,
+    pub body: Box<MalType>,
+    pub env:  Option<Env>,
+}
+
+#[derive(Debug,Clone)]
 pub enum MalType {
     Nil,
     Bool(bool),
@@ -30,6 +38,7 @@ pub enum MalType {
     Dict(HashMap<MalHashable, MalType>),
     Vector(Vec<MalType>),
     Function(MalFunction),
+    Fn(MalFn),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

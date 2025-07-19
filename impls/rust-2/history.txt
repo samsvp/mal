@@ -1,64 +1,101 @@
 #V2
-hello
-(+ 1 2 3)
-(+ 1 2 3 "hello")
-123
-123.2
+(fn* (a 2) 1)
+(fn* (a b) 1)
+((fn* (a b) 1) 1 2)
+((fn* (a b) 1) 1 2 3)
 (1 2 3)
-(1, 2 3)
-(1, 2 3),,,
-(1 2
-(1 2 3)
-[1 2 3]
-(
-[
-(1 2
-[1 2
-(1 2 3)
-(+ 1 2 3)
-"hwllo"
-"he
-(1 2 3)
-(+ 1 2 3)
-(1 2 3)
-(+ 1 2 3)
-(+ 1 2 3 4)
-(+ 1 2 "a")
-(+ "b" "a")
-(+ "b" "a" "wow")
-(+ "b" "a" "wow" "")
-(+ "b" "a" "wow" "" "yay")
-(+ (1 2 3) (4 5 6))
-(+ (1 2 3) (4 5 6) (98 7 8 8 8))
-(- 1 2)
-(- 1 2 3 4 5)
-(* 1 2 3 4 5)
-{"a" 1}
-{"a" 1 }
-{"a" (+ 12 3 5) }
-(+ 1 2 3)
-(def! a 5)
+(1 2 3 (fn* (a b) 1))
+((fn* (a b) 1) 1 2 3)
+1 2
+(fn* (a b) 1 2)
+fn*
+fn* (a b) 1 2
+(fn* (a b) 1 2)
+((fn* (a b) 1) 1 2)
+(1 (fn* (a b) 1) 1 2)
+((fn* (a b) 1) 1 2)
+((fn* (a b) 1))
+(1 2)
+((fn* (a b) 1))
+((fn* (a b) 1) 1 2)
+((fn* (a b) (+ a b)) 1 2)
+( (fn* (a b) (+ b a)) 3 4)
+( (fn* () 4) )
+( (fn* () ()) )
+\n( (fn* (f x) (f x)) (fn* (a) (+ 1 a)) 7)
+( ( (fn* (a) (fn* (b) (+ a b))) 5) 7)
+(def! gen-plus5 (fn* () (fn* (b) (+ 5 b))))
+(def! plus5 (gen-plus5))
+(plus5 7)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(plus7 8)
 a
 (def! a 5)
-a
-(def! b (+ a 2))
-b
-(let* (c 2) c)
-c
-(let* (c 2) (+ a c))
-(+ 1 2 3)
-(let* (c 2) (+ a c))
-(def! a 5)
-(let* (c 2) (+ a c))
-(def! b (+ a 2))
-b
-(let* (c 2) (+ a b c))
-(abc 1 2 3)
-(def! w 123)
-(def! w (123))
-(def! w 123)
-(def! w abc)
-w
-(def! w 123)
-(def! w abc)
-w
+(def! b 7)
+(+ a b)
+plus7
+plus7 8
+(plus7 8)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))\n(def! plus7 (gen-plusX 7))
+(plus7 8)
+(def! plus7 (gen-plusX 7))
+(plus7 8)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(plus7 8)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(plus7 8)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(plus7 8)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(plus7 8)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(plus7 8)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(plus7 8)
+( ( (fn* (a) (fn* (b) (+ a b))) 5) 7)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(plus7 8)
+(def! plus7 (gen-plusX 7))
+(plus7 8)
+(def! gen-plusX (fn* (x) (fn* (b) (+ x b))))
+(def! plus7 (gen-plusX 7))
+(plus7 8)
+(def! gen-plusXY (fn* (x) (fn* (y) (fn* (b) (+ x y b)))))\n
+(def! gen-plus7Y (gen-plusXY 7))\n
+(def! plus78 (gen-plus7Y 8))\n
+(plus78 5)\n
+(def! gen-plusXY (fn* (x) (fn* (y) (fn* (b) (+ a x y b)))))\n
+(def! gen-plus7Y (gen-plusXY 7))\n
+(def! plus78 (gen-plus7Y 8))\n
+(plus78 5)\n
+(def! a 5)\n
+(plus78 5)
+plus78
+(def! gen-plusXY (fn* (x) (fn* (y) (fn* (b) (+ x y b)))))\n
+(def! gen-plus7Y (gen-plusXY 7))\n
+(def! plus78 (gen-plus7Y 8))\n
+(plus78 5)\n
+(def! gen-plusXY (fn* (x) (fn* (y) (fn* (b) (+ x y b)))))
+(def! gen-plus7Y (gen-plusXY 7))
+(def! plus78 (gen-plus7Y 8))
+(plus78 5)
+(def! gen-plusXY (fn* (x) (fn* (y) (fn* (b) (+ x y b)))))
+(def! gen-plus7Y (gen-plusXY 7))
+(def! plus78 (gen-plus7Y 8))
+(plus78 5)
+(def! gen-plusXY (fn* (x) (fn* (y) (fn* (b) (+ x y b)))))
+(def! gen-plus7Y (gen-plusXY 7))
+(def! gen-plusXY (fn* (x) (fn* (y) (fn* (b) (+ x y b)))))
+(def! gen-plus7Y (gen-plusXY 7))
+(def! plus78 (gen-plus7Y 8))

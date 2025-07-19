@@ -1,18 +1,20 @@
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use crate::types::MalType;
 
 #[derive(Debug,Clone)]
-pub struct Env<'a> {
-    data: HashMap<String, MalType>,
-    outer: Option<Box<&'a Env<'a>>>,
+pub struct Env {
+    pub data: HashMap<String, MalType>,
+    pub outer: Option<Box<Env>>,
 }
 
-impl<'a> Env<'a> {
-    pub fn new(outer: Option<&'a Env<'a>>) -> Self {
+impl Env {
+    pub fn new(outer: Option<&Self>) -> Self {
         Self {
             data: HashMap::new(),
-            outer: outer.map(|o| Box::new(o)),
+            outer: outer.map(|o| Box::new(o.clone())),
         }
     }
 
