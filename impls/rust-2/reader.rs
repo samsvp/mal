@@ -143,7 +143,7 @@ fn read_list(reader: &mut Reader) -> MalType {
 fn read_fn(reader: &mut Reader) -> MalType {
     let args_result =
         match read_form(reader) {
-            MalType::List(args) => {
+            MalType::List(args) | MalType::Vector(args) => {
                 args.iter().try_fold(Vec::with_capacity(args.len()), |mut acc, x|
                     match x {
                         MalType::Symbol(s) => {

@@ -8,7 +8,7 @@ macro_rules! do_op {
     ($args: expr, MalType::$variant:ident, $init:expr, $fold_op:expr) => {{
         let res = $args.iter().try_fold($init, |acc, v| {
             let MalType::$variant(val) = v else {
-                return Err(types::invalid_argument_error());
+                return Err(types::invalid_argument_error_2(v.clone()));
             };
 
             Ok($fold_op(acc, val))
@@ -56,7 +56,7 @@ macro_rules! do_cmp_fn {
                 let init = initial.clone();
                 cmp!($args, MalType::String, init, $op)
             }
-            _ => MalType::Error("Unsupported type for comparision".to_string())
+            m => MalType::Error(format!("Unsupported type for comparision: {m:#?}"))
         }
     }};
 }
@@ -208,11 +208,13 @@ fn mult(args: Vec<MalType>) -> MalType {
         return MalType::Error("Multiplication on empty list".to_string());
     }
 
-    match args[0] {
+    match &args[0] {
         MalType::Int(_) => {
             do_op!(args, MalType::Int, 1, |acc, v| acc * v)
         }
-        _ => MalType::Error("Unsupported type for '*'".to_string())
+        v => {
+            MalType::Error(format!("Unsupported type for '*': {v:#?}"))
+        }
     }
 }
 

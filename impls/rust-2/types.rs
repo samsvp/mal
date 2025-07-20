@@ -9,6 +9,9 @@ static DIVISION_BY_ZERO: &str = "Division by zero";
 pub fn invalid_argument_error() -> MalType {
     MalType::Error(INVALID_ARGUMENT.to_string())
 }
+pub fn invalid_argument_error_2(who: MalType) -> MalType {
+    MalType::Error(format!("{INVALID_ARGUMENT}: {who:#?}"))
+}
 pub fn division_by_zero_error() -> MalType {
     MalType::Error(DIVISION_BY_ZERO.to_string())
 }
