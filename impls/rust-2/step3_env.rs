@@ -23,7 +23,7 @@ fn def_bang(args: &Vec<MalType>, env: &mut Env) -> MalType {
         return types::invalid_parameter_length_error(args.len(), 3);
     }
     let MalType::Symbol(ref s) = args[1] else {
-        return types::invalid_argument_error();
+        return types::invalid_argument_error(args[1].clone());
     };
     let v = eval(args[2].clone(), env);
     match v {
@@ -43,7 +43,7 @@ fn let_star(args: &Vec<MalType>, env: &mut Env) -> MalType {
         _ => None,
     };
     let Some(ref s) = maybe_s else {
-        return types::invalid_argument_error();
+        return types::invalid_argument_error(args[1].clone());
     };
     if s.len() % 2 != 0 {
         return types::invalid_parameter_length_error(s.len(), s.len() + 1);

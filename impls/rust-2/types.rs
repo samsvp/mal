@@ -6,10 +6,7 @@ pub type MalFunction = fn (Vec<MalType>) -> MalType;
 
 static INVALID_ARGUMENT: &str = "Invalid argument";
 static DIVISION_BY_ZERO: &str = "Division by zero";
-pub fn invalid_argument_error() -> MalType {
-    MalType::Error(INVALID_ARGUMENT.to_string())
-}
-pub fn invalid_argument_error_2(who: MalType) -> MalType {
+pub fn invalid_argument_error(who: MalType) -> MalType {
     MalType::Error(format!("{INVALID_ARGUMENT}: {who:#?}"))
 }
 pub fn division_by_zero_error() -> MalType {

@@ -7,7 +7,7 @@ macro_rules! do_op {
     ($args: expr, MalType::$variant:ident, $init:expr, $fold_op:expr) => {{
         let res = $args.iter().try_fold($init, |acc, v| {
             let MalType::$variant(val) = v else {
-                return Err(types::invalid_argument_error());
+                return Err(types::invalid_argument_error(v.clone()));
             };
 
             Ok($fold_op(acc, val))
@@ -83,7 +83,7 @@ fn div(args: Vec<MalType>) -> MalType {
             }
             let res = args[1..].iter().try_fold(v, |acc, v| {
                 let MalType::Int(val) = v else {
-                    return Err(types::invalid_argument_error());
+                    return Err(types::invalid_argument_error(v.clone()));
                 };
                 if *val == 0 {
                     return Err(types::division_by_zero_error());
