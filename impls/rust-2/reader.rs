@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use regex::Regex;
 use once_cell::sync::Lazy;
 
-use crate::types::{HashableConvertError, MalFn, MalHashable, MalType};
+use crate::types::{MalError, MalFn, MalHashable, MalResult, MalType};
 
 static RE: Lazy<Regex> = Lazy::new(
     || Regex::new(r##"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)"##).unwrap()
@@ -36,21 +36,21 @@ impl Reader {
     }
 }
 
-fn read_atom(token: &str) -> MalType {
+fn read_atom(token: &str) -> MalResult {
     match token {
-        "nil" => MalType::Nil,
-        "false" => MalType::Bool(false),
-        "true" => MalType::Bool(true),
-        "" => MalType::Nil,
+        "nil" => Ok(MalType::Nil),
+        "false" => Ok(MalType::Bool(false)),
+        "true" => Ok(MalType::Bool(true)),
+        "" => Ok(MalType::Nil),
         _ => {
             if let Ok(i) = token.parse::<i64>() {
-                return MalType::Int(i);
+                return Ok(MalType::Int(i));
             }
 
             let chars = token.as_bytes();
             if chars[0] == b'"' {
                 if token.len() < 2 || chars[chars.len() - 1] != b'"' {
-                    return MalType::Error("EOF unclosed string.".to_string());
+                    return Err(MalError::new("EOF unclosed string.".to_string()));
                 }
 
                 let mut backslash_amount = 0;
@@ -60,25 +60,25 @@ fn read_atom(token: &str) -> MalType {
                     backslash_amount += 1;
                 }
                 if backslash_amount % 2 != 0 {
-                    return MalType::Error("EOF unclosed string.".to_string());
+                    return Err(MalError::new("EOF unclosed string.".to_string()));
                 }
-                return MalType::String(token[1..token.len()-1].to_string());
+                return Ok(MalType::String(token[1..token.len()-1].to_string()));
             };
-            MalType::Symbol(token.to_string())
+            Ok(MalType::Symbol(token.to_string()))
         },
     }
 }
 
-fn read_dict(reader: &mut Reader) -> MalType {
-    fn parse(reader: &mut Reader, acc: &mut Vec<MalType>) -> MalType {
+fn read_dict(reader: &mut Reader) -> MalResult {
+    fn parse(reader: &mut Reader, acc: &mut Vec<MalType>) -> MalResult {
         match reader.peek() {
             Some("}") => {
                 reader.next();
                 if acc.len() % 2 != 0 {
-                    return MalType::Error("Hash map needs an even number of elements".to_string());
+                    return Err(MalError::new("Hash map needs an even number of elements".to_string()));
                 }
 
-                let result: Result<HashMap<_,_>, HashableConvertError> = acc
+                let map: HashMap<_,_> = acc
                     .chunks(2)
                     .try_fold(HashMap::with_capacity(acc.len()/2), |mut map, chunk| {
                         let key = chunk[0].clone();
@@ -86,26 +86,23 @@ fn read_dict(reader: &mut Reader) -> MalType {
                         let hashable_key = MalHashable::to_hashable(key)?;
                         map.insert(hashable_key, value);
                         Ok(map)
-                    });
+                    })?;
 
-                match result {
-                    Ok(map) => MalType::Dict(map),
-                    Err(e) => MalType::Error(e.to_string()),
-                }
+                Ok(MalType::Dict(map))
             },
             Some(_) => {
-                let v = read_form(reader);
+                let v = read_form(reader)?;
                 acc.push(v);
                 parse(reader, acc)
             },
-            None => MalType::Error("EOF unmatched '}'".to_string())
+            None => Err(MalError::new("EOF unmatched '}'".to_string()))
         }
     }
     parse(reader, &mut vec![])
 }
 
-fn read_collection(reader: &mut Reader, col_type: ColType) -> MalType {
-    fn parse(reader: &mut Reader, col_type: ColType, acc: &mut Vec<MalType>) -> MalType {
+fn read_collection(reader: &mut Reader, col_type: ColType) -> MalResult {
+    fn parse(reader: &mut Reader, col_type: ColType, acc: &mut Vec<MalType>) -> MalResult {
         let close = match col_type {
             ColType::List => ")",
             ColType::Vec => "]",
@@ -115,16 +112,16 @@ fn read_collection(reader: &mut Reader, col_type: ColType) -> MalType {
             Some(char) if char == close => {
                 reader.next();
                 match col_type {
-                    ColType::Vec => MalType::Vector(acc.to_vec()),
-                    ColType::List => MalType::List(acc.to_vec()),
+                    ColType::Vec => Ok(MalType::Vector(acc.to_vec())),
+                    ColType::List => Ok(MalType::List(acc.to_vec())),
                 }
             },
             Some(_) => {
-                let v = read_form(reader);
+                let v = read_form(reader)?;
                 acc.push(v);
                 parse(reader, col_type, acc)
             },
-            None => MalType::Error(format!("EOF unmatched '{close}'"))
+            None => Err(MalError::new(format!("EOF unmatched '{close}'")))
         }
 
     }
@@ -132,17 +129,17 @@ fn read_collection(reader: &mut Reader, col_type: ColType) -> MalType {
 }
 
 
-fn read_vec(reader: &mut Reader) -> MalType {
+fn read_vec(reader: &mut Reader) -> MalResult {
     read_collection(reader, ColType::Vec)
 }
 
-fn read_list(reader: &mut Reader) -> MalType {
+fn read_list(reader: &mut Reader) -> MalResult {
     read_collection(reader, ColType::List)
 }
 
-fn read_fn(reader: &mut Reader) -> MalType {
-    let args_result =
-        match read_form(reader) {
+fn read_fn(reader: &mut Reader) -> MalResult {
+    let args =
+        match read_form(reader)? {
             MalType::List(args) | MalType::Vector(args) => {
                 args.iter().try_fold(Vec::with_capacity(args.len()), |mut acc, x|
                     match x {
@@ -150,30 +147,20 @@ fn read_fn(reader: &mut Reader) -> MalType {
                             acc.push(s.to_string());
                             Ok(acc)
                         },
-                        MalType::Error(e) => Err(MalType::Error(e.to_string())),
-                        _ => Err(MalType::Error("Function parameters must be symbols.".to_string())),
+                        _ => Err(MalError::new("Function parameters must be symbols.".to_string())),
                     })
             },
-            _ => Err(MalType::Error("Function arguments must list.".to_string())),
-        };
+            _ => Err(MalError::new("Function arguments must list.".to_string())),
+        }?;
 
-    match read_form(reader) {
-        MalType::Error(err) => MalType::Error(err),
-        body => {
-            match args_result {
-                Ok(args) => {
-                    reader.next();
-                    MalType::Fn(MalFn {args, body: Box::new(body), env: None})
-                },
-                Err(err) => err,
-            }
-        }
-    }
+    let body = read_form(reader)?;
+    reader.next();
+    Ok(MalType::Fn(MalFn {args, body: Box::new(body), env: None}))
 }
 
-fn read_form(reader: &mut Reader) -> MalType {
+fn read_form(reader: &mut Reader) -> MalResult {
     let Some(token) = reader.next() else {
-        return MalType::Nil;
+        return Ok(MalType::Nil);
     };
 
     match token {
@@ -184,7 +171,7 @@ fn read_form(reader: &mut Reader) -> MalType {
                     read_fn(reader)
                 },
                 Some(_) => read_list(reader),
-                _ => MalType::Error("EOF unmatched ')'".to_string()),
+                _ => Err(MalError::new("EOF unmatched ')'".to_string())),
             }
         },
         "[" => read_vec(reader),
@@ -200,7 +187,7 @@ fn tokenize(string: &str) -> Vec<String> {
         .collect()
 }
 
-pub fn read_str(string: &str) -> MalType {
+pub fn read_str(string: &str) -> MalResult {
     let tokens = tokenize(string);
     let mut reader = Reader { tokens, pos: 0 };
     read_form(&mut reader)

@@ -52,15 +52,26 @@ pub enum MalHashable {
 }
 
 #[derive(Debug,Clone)]
-pub struct HashableConvertError;
-impl fmt::Display for HashableConvertError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Value is not hashable.")
+pub struct MalError {
+    msg: String
+}
+
+impl MalError {
+    pub fn new(msg: String) -> Self {
+        Self { msg }
     }
 }
 
+impl fmt::Display for MalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+pub type MalResult = Result<MalType, MalError>;
+
 impl MalHashable {
-    pub fn to_hashable(t: MalType) -> Result<MalHashable, HashableConvertError> {
+    pub fn to_hashable(t: MalType) -> Result<MalHashable, MalError> {
         match t {
             MalType::Nil => Ok(MalHashable::Nil),
             MalType::Int(i) => Ok(MalHashable::Int(i)),
@@ -68,7 +79,7 @@ impl MalHashable {
             MalType::Symbol(s) => Ok(MalHashable::Symbol(s)),
             MalType::String(s) => Ok(MalHashable::String(s)),
             MalType::KeyWord(s) => Ok(MalHashable::KeyWord(s)),
-            _ => Err(HashableConvertError),
+            v => Err(MalError::new(format!("Unhashable value {v:#?}"))),
         }
     }
 

@@ -5,11 +5,11 @@ mod env;
 
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
-use types::MalType;
+use types::{MalResult, MalType};
 
 use crate::printer::pr_str;
 
-fn read(val: &str) -> MalType {
+fn read(val: &str) -> MalResult {
     reader::read_str(val)
 }
 
@@ -17,12 +17,15 @@ fn eval(val: MalType) -> MalType {
     val
 }
 
-fn print(val: MalType) -> MalType {
-    val
+fn print(val: MalType) -> String {
+    pr_str(val, true)
 }
 
-fn rep(val: &str) -> MalType {
-    print(eval(read(val)))
+fn rep(val: &str) -> String {
+    match read(val) {
+        Ok(m) => print(eval(m)),
+        Err(err) => format!("Parse error: {err}"),
+    }
 }
 
 fn main() -> Result<()> {
@@ -34,9 +37,8 @@ fn main() -> Result<()> {
         match readline {
             Ok(line) => {
                 let v = rep(&line);
-                let _ = rl.add_history_entry(&line);
-                let v = pr_str(v, true);
                 println!("{v}");
+                let _ = rl.add_history_entry(&line);
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
             Err(err) => {

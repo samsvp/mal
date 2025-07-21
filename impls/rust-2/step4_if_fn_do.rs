@@ -10,7 +10,7 @@ use env::Env;
 use core::get_env;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
-use types::{MalHashable, MalType, MalFn};
+use types::{MalFn, MalHashable, MalResult, MalType};
 
 use crate::printer::pr_str;
 
@@ -130,7 +130,7 @@ static KEYWORDS: phf::Map<&'static str, fn(&Vec<MalType>, &mut Env) -> MalType> 
     "if" => if_,
 };
 
-fn read(val: &str) -> MalType {
+fn read(val: &str) -> MalResult {
     reader::read_str(val)
 }
 
@@ -216,13 +216,10 @@ fn print(val: MalType) -> String {
 }
 
 fn rep(val: &str, env: &mut Env) -> String {
-    print(
-        eval(
-            &read(val),
-            env,
-            false,
-        )
-    )
+    match read(val) {
+        Ok(m) => print(eval(&m, env, false)),
+        Err(err) => format!("Parse error: {err}"),
+    }
 }
 
 fn main() -> Result<()> {
