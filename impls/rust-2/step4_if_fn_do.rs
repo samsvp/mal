@@ -21,7 +21,7 @@ fn def_bang(args: &Vec<MalType>, env: &mut Env) -> MalType {
     let MalType::Symbol(ref s) = args[1] else {
         return types::invalid_argument_error(args[1].clone());
     };
-    let v = eval(args[2].clone(), env, false);
+    let v = eval(&args[2], env, false);
     match v {
         MalType::Error(_) => (),
         _ => env.set(s.to_string(), v.clone()),
@@ -64,7 +64,7 @@ fn let_star(args: &Vec<MalType>, env: &mut Env) -> MalType {
                 let new_fn = MalFn { env: Some(new_env.clone()), ..fn_ };
                 new_env.set(key, MalType::Fn(new_fn));
             }
-            eval(args[2].clone(), &mut new_env, true)
+            eval(&args[2], &mut new_env, true)
         },
         Err(e) => e,
     }
@@ -75,7 +75,7 @@ fn do_(args: &Vec<MalType>, env: &mut Env) -> MalType {
         return types::invalid_parameter_length_error(args.len(), 2);
     }
 
-    args[1..].iter().map(|x| eval(x.clone(), env, false)).collect::<Vec<MalType>>().last().cloned().unwrap()
+    args[1..].iter().map(|x| eval(x, env, false)).collect::<Vec<MalType>>().last().cloned().unwrap()
 }
 
 fn if_(args: &Vec<MalType>, env: &mut Env) -> MalType {
@@ -86,15 +86,18 @@ fn if_(args: &Vec<MalType>, env: &mut Env) -> MalType {
             return types::invalid_parameter_length_error(args.len(), 4);
         }
     }
+    let condition = &args[1];
+    let if_true = &args[2];
 
-    match eval(args[1].clone(), env, false) {
+    match eval(&condition, env, false) {
         MalType::Nil | MalType::Bool(false) => {
             if args.len() == 3 {
                 return MalType::Nil;
             }
-            eval(args[3].clone(), env, false)
+            let if_false = &args[3];
+            eval(&if_false, env, false)
         },
-        _ => eval(args[2].clone(), env, false)
+        _ => eval(&if_true, env, false)
     }
 }
 
@@ -113,11 +116,11 @@ fn fn_star(fn_: MalFn, args: Vec<MalType>, env: &Env) -> MalType {
         let mut eval_env = env.clone();
         let val = match &args[i] {
             MalType::Fn(_) => args[i].clone(),
-            v => eval(v.clone(), &mut eval_env, true),
+            v => eval(v, &mut eval_env, true),
         };
         fn_env.set(fn_.args[i].clone(), val);
     }
-    eval(*fn_.body, &mut fn_env, true)
+    eval(&fn_.body, &mut fn_env, true)
 }
 
 static KEYWORDS: phf::Map<&'static str, fn(&Vec<MalType>, &mut Env) -> MalType> = phf::phf_map!{
@@ -131,7 +134,7 @@ fn read(val: &str) -> MalType {
     reader::read_str(val)
 }
 
-fn eval(val: MalType, env: &mut Env, copy_env: bool) -> MalType {
+fn eval(val: &MalType, env: &mut Env, copy_env: bool) -> MalType {
     match env.get("DEBUG-EVAL".to_string()) {
         Some(MalType::Nil) | Some(MalType::Bool(false)) | None => (),
         _ => {
@@ -145,18 +148,18 @@ fn eval(val: MalType, env: &mut Env, copy_env: bool) -> MalType {
             let Some(v) = env.get(s.clone()) else {
                 return MalType::Error(format!("{s} not found"));
             };
-            eval(v.clone(), env, copy_env)
+            eval(&v, env, copy_env)
         },
         MalType::List(xs) => {
             if xs.len() == 0 {
                 return MalType::List(vec![]);
             }
 
-            let op = eval(xs[0].clone(), env, copy_env);
+            let op = eval(&xs[0], env, copy_env);
             match op {
                 MalType::Function(fun) => {
                     if xs.len() > 1 {
-                        let values: Vec<MalType> = xs[1..].iter().map(|x| eval(x.clone(), env, copy_env)).collect();
+                        let values: Vec<MalType> = xs[1..].iter().map(|x| eval(x, env, copy_env)).collect();
                         fun(values)
                     } else {
                         fun(vec![])
@@ -188,10 +191,15 @@ fn eval(val: MalType, env: &mut Env, copy_env: bool) -> MalType {
             MalType::Vector(values)
         }
         MalType::Dict(ds) => {
-            let values: HashMap<MalHashable, MalType> = ds.into_iter().map(|(key, x)| (key, eval(x, env, copy_env))).collect();
+            let values: HashMap<MalHashable, MalType> =
+                ds
+                .iter()
+                .map(|(key, x)| (key.clone(), eval(x, env, copy_env)))
+                .collect();
             MalType::Dict(values)
         }
         MalType::Fn(fn_) => {
+            let fn_ = fn_.clone();
             let fn_ = if copy_env && fn_.env.is_none() {
                 MalFn { env: Some(env.clone()), ..fn_ }
             } else {
@@ -199,7 +207,7 @@ fn eval(val: MalType, env: &mut Env, copy_env: bool) -> MalType {
             };
             MalType::Fn(fn_)
         }
-        _ => val
+        _ => val.clone(),
     }
 }
 
@@ -210,7 +218,7 @@ fn print(val: MalType) -> MalType {
 fn rep(val: &str, env: &mut Env) -> MalType {
     print(
         eval(
-            read(val),
+            &read(val),
             env,
             false,
         )
