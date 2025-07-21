@@ -75,6 +75,14 @@ static KEYWORDS: phf::Map<&'static str, fn(&Vec<MalType>, &mut Env) -> MalType> 
 };
 
 fn eval(val: MalType, env: &mut Env) -> MalType {
+    match env.get("DEBUG-EVAL".to_string()) {
+        Some(MalType::Nil) | Some(MalType::Bool(false)) | None => (),
+        _ => {
+            let s = pr_str(val.clone(), true);
+            println!("EVAL: {s}")
+        }
+    }
+
     match val {
         MalType::Symbol(s) if !KEYWORDS.contains_key(&s) => {
             let Some(v) = env.get(s.clone()) else {
@@ -144,7 +152,7 @@ fn main() -> Result<()> {
             Ok(line) => {
                 let v = rep(&line, &mut env);
                 let _ = rl.add_history_entry(&line);
-                let v = pr_str(v);
+                let v = pr_str(v, true);
                 println!("{v}");
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,

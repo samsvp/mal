@@ -138,7 +138,7 @@ fn empty_question(args: Vec<MalType>) -> MalType {
 
 fn prn(args: Vec<MalType>) -> MalType {
     for arg in args {
-        let s = pr_str(arg);
+        let s = pr_str(arg, true);
         print!("{s}");
     }
     println!("");

@@ -35,7 +35,7 @@ fn main() -> Result<()> {
             Ok(line) => {
                 let v = rep(&line);
                 let _ = rl.add_history_entry(&line);
-                let v = pr_str(v);
+                let v = pr_str(v, true);
                 println!("{v}");
             },
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
