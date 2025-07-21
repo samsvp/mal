@@ -110,9 +110,10 @@ fn fn_star(fn_: MalFn, args: Vec<MalType>, env: &Env) -> MalType {
     };
 
     for i in 0..args.len() {
+        let mut eval_env = env.clone();
         let val = match &args[i] {
             MalType::Fn(_) => args[i].clone(),
-            v => eval(v.clone(), &mut fn_env, true),
+            v => eval(v.clone(), &mut eval_env, true),
         };
         fn_env.set(fn_.args[i].clone(), val);
     }
