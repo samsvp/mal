@@ -255,6 +255,20 @@ fn prn(args: Vec<MalType>) -> MalType {
     MalType::Nil
 }
 
+fn println_(args: Vec<MalType>) -> MalType {
+    let s = args
+        .iter()
+        .map(|a| {
+            pr_str(a.clone(), false)
+                .replace("\\n", "\n")
+                .replace("\\\"", "\"")
+        })
+        .collect::<Vec<String>>()
+        .join(" ");
+    println!("{s}");
+    MalType::Nil
+}
+
 pub fn get_env() -> Env {
     let env: HashMap<String, MalType> = HashMap::from([
         ("+".to_string(), MalType::Function(add)),
@@ -274,6 +288,7 @@ pub fn get_env() -> Env {
         ("prn".to_string(), MalType::Function(prn)),
         ("pr-str".to_string(), MalType::Function(pr_str_)),
         ("str".to_string(), MalType::Function(str_)),
+        ("println".to_string(), MalType::Function(println_)),
     ]);
     Env::from(env)
 }

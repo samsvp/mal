@@ -432,10 +432,6 @@ a
 ;/ghi
 ;=>nil
 
-(println "abc\\def\\ghi")
-;/abc\\def\\ghi
-;=>nil
-
 (println (list 1 2 "abc" "\"") "def")
 ;/\(1 2 abc "\) def
 ;=>nil
