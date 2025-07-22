@@ -10,7 +10,7 @@ use env::Env;
 use core::get_env;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
-use types::{MalFn, MalHashable, MalResult, MalType};
+use types::{MalError, MalFn, MalHashable, MalResult, MalType};
 
 use crate::printer::pr_str;
 
@@ -102,7 +102,13 @@ fn if_(args: &Vec<MalType>, env: &mut Env) -> MalType {
 }
 
 fn fn_star(fn_: MalFn, args: Vec<MalType>, env: &Env) -> MalType {
-    if fn_.args.len() != args.len() {
+    if fn_.is_variadic {
+        let got = args.len();
+        let expected = fn_.args.len() - 1;
+        if expected > got {
+            return MalType::Error(format!("Invalid parameter length: got {got}, expected at least {expected}."))
+        }
+    } else if fn_.args.len() != args.len() {
         return types::invalid_parameter_length_error(args.len() - 1, fn_.args.len());
     }
 
@@ -112,11 +118,21 @@ fn fn_star(fn_: MalFn, args: Vec<MalType>, env: &Env) -> MalType {
         Env::new(Some(env))
     };
 
-    for i in 0..args.len() {
+    for i in 0..fn_.args.len() {
         let mut eval_env = env.clone();
-        let val = match &args[i] {
-            MalType::Fn(_) => args[i].clone(),
-            v => eval(v, &mut eval_env, true),
+        // variadic argument
+        let val = if fn_.is_variadic && i == fn_.args.len() - 1 {
+            let var_args = if args.len() == i {
+                MalType::List(vec![])
+            } else {
+                MalType::List(args[i..].to_vec())
+            };
+            eval(&var_args, &mut eval_env, true)
+        } else {
+            match &args[i] {
+                MalType::Fn(_) => args[i].clone(),
+                v => eval(v, &mut eval_env, true),
+            }
         };
         fn_env.set(fn_.args[i].clone(), val);
     }
@@ -170,7 +186,7 @@ fn eval(val: &MalType, env: &mut Env, copy_env: bool) -> MalType {
                 },
                 MalType::Fn(fn_) => {
                     if xs.len() == 1 {
-                        if fn_.args.len() != 0 {
+                        if fn_.args.len() != 0 && (!fn_.is_variadic || fn_.args.len() > 1) {
                             return MalType::Fn(fn_);
                         } else {
                             return fn_star(fn_, vec![], env);
@@ -212,13 +228,24 @@ fn eval(val: &MalType, env: &mut Env, copy_env: bool) -> MalType {
 }
 
 fn print(val: MalType) -> String {
-    pr_str(val, true)
+    let s = pr_str(val.clone(), false);
+    match val {
+        MalType::String(_) => format!("\"{s}\""),
+        _ => s
+    }
+}
+
+fn re(val: &str, env: &mut Env) -> MalResult {
+    match read(val) {
+        Ok(m) => Ok(eval(&m, env, false)),
+        Err(err) => Err(MalError::new(format!("Parse error: {err}"))),
+    }
 }
 
 fn rep(val: &str, env: &mut Env) -> String {
-    match read(val) {
-        Ok(m) => print(eval(&m, env, false)),
-        Err(err) => format!("Parse error: {err}"),
+    match re(val, env) {
+        Ok(v) => print(v),
+        Err(err) => err.to_string(),
     }
 }
 
@@ -227,6 +254,8 @@ fn main() -> Result<()> {
     let _ = rl.load_history("history.txt");
 
     let mut env = get_env();
+
+    re("(def! not (fn* (a) (if a false true)))", &mut env).expect("Not function failed to register.");
 
     loop {
         let readline = rl.readline("user> ");

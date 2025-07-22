@@ -57,7 +57,7 @@ pub fn pr_str(var: MalType, print_readably: bool) -> String {
         MalType::String(s) => {
             if print_readably {
                 let s = escape_str(&s);
-                format!("\"{s}\"")
+                format!("\\\"{s}\\\"")
             } else {
                 s.clone()
             }

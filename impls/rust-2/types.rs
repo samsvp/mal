@@ -23,6 +23,7 @@ pub struct MalFn {
     pub args: Vec<String>,
     pub body: Box<MalType>,
     pub env:  Option<Env>,
+    pub is_variadic: bool,
 }
 
 #[derive(Debug,Clone)]

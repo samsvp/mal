@@ -138,11 +138,19 @@ fn read_list(reader: &mut Reader) -> MalResult {
 }
 
 fn read_fn(reader: &mut Reader) -> MalResult {
+    let mut is_variadic = false;
     let args =
         match read_form(reader)? {
             MalType::List(args) | MalType::Vector(args) => {
-                args.iter().try_fold(Vec::with_capacity(args.len()), |mut acc, x|
+                args.iter().enumerate().try_fold(Vec::with_capacity(args.len()), |mut acc, (i, x)|
                     match x {
+                        MalType::Symbol(s) if s == "&" => {
+                            if i != args.len() - 2 {
+                                return Err(MalError::new("Variadic argument must be the last".to_string()));
+                            }
+                            is_variadic = true;
+                            Ok(acc)
+                        },
                         MalType::Symbol(s) => {
                             acc.push(s.to_string());
                             Ok(acc)
@@ -155,7 +163,7 @@ fn read_fn(reader: &mut Reader) -> MalResult {
 
     let body = read_form(reader)?;
     reader.next();
-    Ok(MalType::Fn(MalFn {args, body: Box::new(body), env: None}))
+    Ok(MalType::Fn(MalFn {args, body: Box::new(body), env: None, is_variadic}))
 }
 
 fn read_form(reader: &mut Reader) -> MalResult {

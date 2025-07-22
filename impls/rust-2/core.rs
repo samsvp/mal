@@ -136,15 +136,6 @@ fn empty_question(args: Vec<MalType>) -> MalType {
     MalType::Bool(res)
 }
 
-fn prn(args: Vec<MalType>) -> MalType {
-    for arg in args {
-        let s = pr_str(arg, true);
-        print!("{s}");
-    }
-    println!("");
-    MalType::Nil
-}
-
 fn count(args: Vec<MalType>) -> MalType {
     if args.len() == 1 {
         return match &args[0] {
@@ -247,6 +238,23 @@ fn div(args: Vec<MalType>) -> MalType {
     }
 }
 
+fn pr_str_(args: Vec<MalType>) -> MalType {
+    let v = args.iter().map(|a| pr_str(a.clone(), true)).collect::<Vec<String>>().join(" ");
+    MalType::String(v)
+}
+
+fn str_(args: Vec<MalType>) -> MalType {
+    let v = args.iter().map(|a| pr_str(a.clone(), false)).collect::<Vec<String>>().join("");
+    MalType::String(v)
+}
+
+fn prn(args: Vec<MalType>) -> MalType {
+    let strs: Vec<String> = args.iter().map(|x| pr_str(x.clone(), true)).collect();
+    let v = format!("{}", strs.join(" "));
+    println!("{v}");
+    MalType::Nil
+}
+
 pub fn get_env() -> Env {
     let env: HashMap<String, MalType> = HashMap::from([
         ("+".to_string(), MalType::Function(add)),
@@ -263,7 +271,9 @@ pub fn get_env() -> Env {
         ("list?".to_string(), MalType::Function(list_question)),
         ("empty?".to_string(), MalType::Function(empty_question)),
         ("count".to_string(), MalType::Function(count)),
-        ("prn".to_string(), MalType::Function(prn))
+        ("prn".to_string(), MalType::Function(prn)),
+        ("pr-str".to_string(), MalType::Function(pr_str_)),
+        ("str".to_string(), MalType::Function(str_)),
     ]);
     Env::from(env)
 }
