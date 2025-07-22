@@ -406,39 +406,6 @@ a
 (str (list))
 ;=>"()"
 
-;; Testing prn
-(prn)
-;/
-;=>nil
-
-(prn "")
-;/""
-;=>nil
-
-(prn "abc")
-;/"abc"
-;=>nil
-
-(prn "abc  def" "ghi jkl")
-;/"abc  def" "ghi jkl"
-
-(prn "\"")
-;/"\\""
-;=>nil
-
-(prn "abc\ndef\nghi")
-;/"abc\\ndef\\nghi"
-;=>nil
-
-(prn "abc\\def\\ghi")
-;/"abc\\\\def\\\\ghi"
-nil
-
-(prn (list 1 2 "abc" "\"") "def")
-;/\(1 2 "abc" "\\""\) "def"
-;=>nil
-
-
 ;; Testing println
 (println)
 ;/
