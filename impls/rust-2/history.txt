@@ -1,8 +1,4 @@
 #V2
-( (fn* (& more) (count more)))
-( (fn* (& more) (count more)) 1)
-( (fn* (& more) (count more)) 2)
-( (fn* (x & more) (count more)) 2)
 ( (fn* (x & more) (count more)) 2 3)
 ( (fn* (x & more) (count more)) 2 3 4 5)
 ( (fn* (x & more) (count more)))
@@ -99,3 +95,7 @@
 (println "\\"")
 (str "\\"")
 (println "abc\\ndef\\nghi")\n
+(str "\\"")
+(println "\\"")
+(println "abc\\\\def\\\\ghi")
+(println (list 1 2 "abc" "\\"") "def")

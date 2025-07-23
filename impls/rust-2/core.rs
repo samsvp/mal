@@ -108,11 +108,30 @@ fn equals(args: Vec<MalType>) -> MalType {
             });
             MalType::Bool(res)
         }
+        MalType::KeyWord(k1) => {
+            let res = args[1..].iter().all(|a| match a {
+                MalType::KeyWord(k2) => k1 == k2,
+                _ => false,
+            });
+            MalType::Bool(res)
+        }
         _ => do_cmp_fn!(args, ==),
     }
 }
 fn not_equals(args: Vec<MalType>) -> MalType {
-    do_cmp_fn!(args, !=)
+    if args.len() == 0 || args.len() == 1 {
+        return MalType::Error("Comparision needs at least two parameters.".to_string());
+    }
+
+    match &args[0] {
+        MalType::List(_) | MalType::Vector(_) | MalType::Nil | MalType::KeyWord(_) => {
+            match equals(args) {
+                MalType::Bool(b) => MalType::Bool(!b),
+                _ => MalType::Bool(false),
+            }
+        }
+        _ => do_cmp_fn!(args, !=),
+    }
 }
 
 fn list(args: Vec<MalType>) -> MalType {

@@ -63,7 +63,9 @@ fn read_atom(token: &str) -> MalResult {
                     return Err(MalError::new("EOF unclosed string.".to_string()));
                 }
                 return Ok(MalType::String(token[1..token.len()-1].to_string()));
-            };
+            } else if chars[0] == b':' {
+                return Ok(MalType::KeyWord(token.to_string()));
+            }
             Ok(MalType::Symbol(token.to_string()))
         },
     }
