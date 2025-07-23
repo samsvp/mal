@@ -14,69 +14,7 @@ use types::{MalError, MalFn, MalHashable, MalResult, MalType};
 
 use crate::printer::pr_str;
 
-fn def_bang(args: &Vec<MalType>, env: &mut Env) -> MalType {
-    if args.len() != 3 {
-        return types::invalid_parameter_length_error(args.len(), 3);
-    }
-    let MalType::Symbol(ref s) = args[1] else {
-        return types::invalid_argument_error(args[1].clone());
-    };
-    let v = eval(&args[2], env, false);
-    match v {
-        MalType::Error(_) => (),
-        _ => env.set(s.to_string(), v.clone()),
-    }
-    v
-}
-
-fn fn_star(fn_: MalFn, args: Vec<MalType>, env: &Env) -> MalType {
-    if fn_.is_variadic {
-        let got = args.len();
-        let expected = fn_.args.len() - 1;
-        if expected > got {
-            return MalType::Error(format!("Invalid parameter length: got {got}, expected at least {expected}."))
-        }
-    } else if fn_.args.len() != args.len() {
-        return types::invalid_parameter_length_error(args.len() - 1, fn_.args.len());
-    }
-
-    let mut fn_env = if let Some(env) = fn_.env.clone() {
-        env
-    } else {
-        Env::new(Some(env))
-    };
-
-    for i in 0..fn_.args.len() {
-        let mut eval_env = env.clone();
-        // variadic argument
-        let val = if fn_.is_variadic && i == fn_.args.len() - 1 {
-            let var_args = if args.len() == i {
-                MalType::List(vec![])
-            } else {
-                MalType::List(args[i..].to_vec())
-            };
-            eval(&var_args, &mut eval_env, true)
-        } else {
-            match &args[i] {
-                MalType::Fn(_) => args[i].clone(),
-                v => eval(v, &mut eval_env, true),
-            }
-        };
-        fn_env.set(fn_.args[i].clone(), val);
-    }
-    eval(&fn_.body, &mut fn_env, true)
-}
-
-fn empty_(_: &Vec<MalType>, _: &mut Env) -> MalType {
-    MalType::Nil
-}
-
-static KEYWORDS: phf::Map<&'static str, fn(&Vec<MalType>, &mut Env) -> MalType> = phf::phf_map!{
-    "def!" => def_bang,
-    "let*" => empty_,
-    "do" => empty_,
-    "if" => empty_,
-};
+static KEYWORDS: [&str; 4] = ["def!", "let*", "do", "if"];
 
 fn read(val: &str) -> MalResult {
     reader::read_str(val)
@@ -91,14 +29,15 @@ fn eval(og_val: &MalType, og_env: &mut Env, og_copy_env: bool) -> MalType {
         }
     }
 
-    let mut val = og_val;
-    let env = og_env;
-    let copy_env = og_copy_env;
+    let mut val = og_val.clone();
+    let mut env = og_env;
+    let mut copy_env = og_copy_env;
+
+    let mut live_env;
 
     loop {
-
         match val {
-            MalType::Symbol(s) if !KEYWORDS.contains_key(&s) => {
+            MalType::Symbol(s) if !KEYWORDS.contains(&s.as_str()) => {
                 let Some(v) = env.get(s.clone()) else {
                     return MalType::Error(format!("{s} not found"));
                 };
@@ -137,10 +76,10 @@ fn eval(og_val: &MalType, og_env: &mut Env, og_copy_env: bool) -> MalType {
                                     return MalType::Nil;
                                 }
                                 let if_false = &args[3];
-                                val = if_false;
+                                val = if_false.clone();
                             },
                             _ => {
-                                val = if_true;
+                                val = if_true.clone();
                             }
                         }
                     }
@@ -151,7 +90,7 @@ fn eval(og_val: &MalType, og_env: &mut Env, og_copy_env: bool) -> MalType {
                         }
 
                         let _ = args[1..args.len()-1].iter().map(|x| eval(x, env, false)).collect::<Vec<MalType>>();
-                        val = args.last().unwrap();
+                        val = args.last().unwrap().clone();
                     },
                     MalType::Symbol(s) if s == "let*" => {
                         let args = xs;
@@ -190,38 +129,92 @@ fn eval(og_val: &MalType, og_env: &mut Env, og_copy_env: bool) -> MalType {
                                     new_env.set(key, MalType::Fn(new_fn));
                                 }
                                 *env = new_env;
-                                val = &args[2];
+                                val = args[2].clone();
                             },
                             Err(e) => {
                                 return e;
                             }
                         };
                     }
-                    MalType::Symbol(s) if KEYWORDS.contains_key(&s) => {
-                        return KEYWORDS.get(&s).unwrap()(&xs, env);
-                    },
+                    MalType::Symbol(s) if s == "def!" => {
+                        let args = xs;
+                        if args.len() != 3 {
+                            return types::invalid_parameter_length_error(args.len(), 3);
+                        }
+                        let MalType::Symbol(ref s) = args[1] else {
+                            return types::invalid_argument_error(args[1].clone());
+                        };
+                        let v = eval(&args[2], env, false);
+                        match v {
+                            MalType::Error(_) => (),
+                            _ => env.set(s.to_string(), v.clone()),
+                        }
+                        return v;
+                    }
                     MalType::Fn(fn_) => {
                         if xs.len() == 1 {
                             if fn_.args.len() != 0 && (!fn_.is_variadic || fn_.args.len() > 1) {
                                 return MalType::Fn(fn_);
-                            } else {
-                                return fn_star(fn_, vec![], env);
                             }
                         }
 
-                        return fn_star(fn_, xs[1..].to_vec(), env);
+                        let args = if xs.len() == 1 {
+                            vec![]
+                        } else {
+                            xs[1..].to_vec()
+                        };
+
+                        //return fn_star(fn_, xs[1..].to_vec(), env);
+                        if fn_.is_variadic {
+                            let got = args.len();
+                            let expected = fn_.args.len() - 1;
+                            if expected > got {
+                                return MalType::Error(format!("Invalid parameter length: got {got}, expected at least {expected}."))
+                            }
+                        } else if fn_.args.len() != args.len() {
+                            return types::invalid_parameter_length_error(args.len() - 1, fn_.args.len());
+                        }
+
+                        let mut fn_env = if let Some(env) = fn_.env.clone() {
+                            env
+                        } else {
+                            Env::new(Some(env))
+                        };
+
+                        for i in 0..fn_.args.len() {
+                            let mut eval_env = env.clone();
+                            // variadic argument
+                            let val = if fn_.is_variadic && i == fn_.args.len() - 1 {
+                                let var_args = if args.len() == i {
+                                    MalType::List(vec![])
+                                } else {
+                                    MalType::List(args[i..].to_vec())
+                                };
+                                eval(&var_args, &mut eval_env, true)
+                            } else {
+                                match &args[i] {
+                                    MalType::Fn(_) => args[i].clone(),
+                                    v => eval(v, &mut eval_env, true),
+                                }
+                            };
+                            fn_env.set(fn_.args[i].clone(), val);
+                        }
+                        live_env = fn_env.clone();
+                        env = &mut live_env;
+                        val = *fn_.body;
+                        copy_env = true;
                     },
                     MalType::Error(e) => {
                         return MalType::Error(e);
                     }
                     _ => {
-                        let values: Vec<MalType> = xs.into_iter().map(|x| eval(x, env, copy_env)).collect();
+                        let values: Vec<MalType> = xs.into_iter().map(|x| eval(&x, env, copy_env)).collect();
                         return MalType::List(values);
                     },
                 }
             }
             MalType::Vector(xs) => {
-                let values: Vec<MalType> = xs.into_iter().map(|x| eval(x, env, copy_env)).collect();
+                let values: Vec<MalType> = xs.into_iter().map(|x| eval(&x, env, copy_env)).collect();
                 return MalType::Vector(values);
             }
             MalType::Dict(ds) => {
@@ -245,7 +238,6 @@ fn eval(og_val: &MalType, og_env: &mut Env, og_copy_env: bool) -> MalType {
                 return val.clone();
             }
         }
-
     }
 }
 
