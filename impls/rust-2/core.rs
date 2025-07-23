@@ -118,6 +118,7 @@ fn equals(args: Vec<MalType>) -> MalType {
         _ => do_cmp_fn!(args, ==),
     }
 }
+
 fn not_equals(args: Vec<MalType>) -> MalType {
     if args.len() == 0 || args.len() == 1 {
         return MalType::Error("Comparision needs at least two parameters.".to_string());
