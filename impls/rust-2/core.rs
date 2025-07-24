@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::fs;
 
 use crate::printer::pr_str;
+use crate::reader::read_str;
 use crate::types::{self, MalType};
 use crate::env::Env;
 
@@ -289,6 +291,36 @@ fn println_(args: Vec<MalType>) -> MalType {
     MalType::Nil
 }
 
+fn read_str_(args: Vec<MalType>) -> MalType {
+    if args.len() != 1 {
+        return MalType::Error("Expects only one argument.".to_string());
+    }
+
+    let MalType::String(ref s) = args[0] else {
+        return MalType::Error("Argument must be string.".to_string());
+    };
+
+    match read_str(&s) {
+        Ok(v) => v,
+        Err(e) => MalType::Error(e.to_string()),
+    }
+}
+
+fn slurp(args: Vec<MalType>) -> MalType {
+    if args.len() != 1 {
+        return MalType::Error("Expects only one argument".to_string());
+    }
+
+    let MalType::String(ref s) = args[0] else {
+        return MalType::Error("Argument must be string.".to_string());
+    };
+
+    match fs::read_to_string(s) {
+        Ok(str) => MalType::String(str),
+        Err(e) => MalType::Error(e.to_string()),
+    }
+}
+
 pub fn get_env() -> Env {
     let env: HashMap<String, MalType> = HashMap::from([
         ("+".to_string(), MalType::Function(add)),
@@ -309,6 +341,9 @@ pub fn get_env() -> Env {
         ("pr-str".to_string(), MalType::Function(pr_str_)),
         ("str".to_string(), MalType::Function(str_)),
         ("println".to_string(), MalType::Function(println_)),
+        ("read-string".to_string(), MalType::Function(read_str_)),
+        ("slurp".to_string(), MalType::Function(slurp)),
     ]);
     Env::from(env)
 }
+

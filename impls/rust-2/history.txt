@@ -1,36 +1,4 @@
 #V2
-(prn "\\"")
-(pr-str "\\"")
-(prn "abc")
-(pr-str "abc")
-(prn "abc")
-(prn "")
-(pr-str "")
-(pr-str "abc")
-""
-"\\""
-"hello"
-""
-"\\""
-(pr-str "\\"")
-"\\"
-"\\""
-""
-\n(pr-str "abc\\\\def\\\\ghi")
-"abc"
-(prn "abc")
-(prn "\\"")
-(pr-str "\\"")
-(str "\\"")
-(prn "\\"")
-(str "\\"")
-(pr-str "\\"")
-(prn "\\"")
-(pr-str "")
-(pr-str "abc")
-(prn "abc")
-(pr-str "abc")
-(pr-str "")
 (prn "")
 (prn "abc  def" "ghi jkl")
 (prn "\\"")
@@ -99,3 +67,35 @@
 (sum2 10 0)
 (def! sum2 (fn* (n acc) (if (= n 0) acc (sum2 (- n 1) (+ n acc)))))
 (sum2 10 0)
+(read-string "(1 2 (3 4) nil)")
+\n(= nil (read-string "nil"))
+(do (do 1 2))
+\n(read-string "7 ;; comment")
+(slurp "7 ;; comment")
+(slurp "step6_file.rs")
+(def! mal-prog (list + 1 2))
+(mal-prog)
+(eval mal-prog)
+(def! mal-prog (list + 1 2))
+(eval mal-prog)
+(def! mal-prog (list + 1 2))
+(eval mal-prog)
+(let* (b 12) (do (eval (read-string "(def! aa 7)")) aa ))
+eval (read-string "(def! aa 7)"))
+(eval (read-string "(def! aa 7)")))
+aa
+(eval (read-string "(def! aa 7)")))
+aa
+(read-string "(def! aa 7)"))
+(eval (read-string "(def! aa 7)")))
+aa
+(eval (read-string "(def! aa 7)")))
+aa
+(eval (read-string "(def! aa 7)")))
+(let* (b 12) (do (eval (read-string "(def! aa 7)")) aa ))
+(load-file "../tests/incA.mal")
+(inc4 3)
+(load-file "../tests/incA.mal")
+inc4
+(load-file "../tests/incA.mal")
+inc4
