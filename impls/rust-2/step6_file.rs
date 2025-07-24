@@ -63,7 +63,8 @@ fn eval(og_val: &MalType, og_env: &mut Env, og_copy_env: bool) -> MalType {
                         if args.len() != 2 {
                             return types::invalid_parameter_length_error(args.len() - 1, 1);
                         }
-                        val = eval(&args[1], env, copy_env);
+
+                        val = eval(&args[1], &mut env.outer(), copy_env);
                     },
                     MalType::Symbol(s) if s == "if" => {
                         let args = xs;
@@ -116,7 +117,7 @@ fn eval(og_val: &MalType, og_env: &mut Env, og_copy_env: bool) -> MalType {
                             return types::invalid_parameter_length_error(s.len(), s.len() + 1);
                         }
 
-                        let new_env = s.chunks(2).try_fold(Env::new(Some(env)), |mut acc, chunk| {
+                        let new_env = s.chunks(2).try_fold(Env::new(Some(&env.clone())), |mut acc, chunk| {
                             let (key, value) = (&chunk[0], &chunk[1]);
                             let MalType::Symbol(key_name) = key else {
                                 return Err(MalType::Error("Only symbols can be assigned values.".to_string()));
@@ -135,7 +136,8 @@ fn eval(og_val: &MalType, og_env: &mut Env, og_copy_env: bool) -> MalType {
                                     let new_fn = MalFn { env: Some(new_env.clone()), ..fn_ };
                                     new_env.set(key, MalType::Fn(new_fn));
                                 }
-                                *env = new_env;
+                                live_env = new_env;
+                                env = &mut live_env;
                                 val = args[2].clone();
                             },
                             Err(e) => {
@@ -171,7 +173,6 @@ fn eval(og_val: &MalType, og_env: &mut Env, og_copy_env: bool) -> MalType {
                             xs[1..].to_vec()
                         };
 
-                        //return fn_star(fn_, xs[1..].to_vec(), env);
                         if fn_.is_variadic {
                             let got = args.len();
                             let expected = fn_.args.len() - 1;

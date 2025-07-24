@@ -1,43 +1,4 @@
 #V2
-(prn "")
-(prn "abc  def" "ghi jkl")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\n")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-(prn "abc\\ndef\\nghi")
-(prn "\\"")
-\n(prn "\\"")
-(prn "abc  def" "ghi jkl")
-\n(prn "\\"")
-\n(prn "abc\\\\def\\\\ghi")
-\n(prn "\\"")
-\n(prn "abc\\\\def\\\\ghi")
-(prn "abc\\ndef\\nghi")
-\n(prn "abc\\\\def\\\\ghi")
-(pr-str "abc\\ndef\\nghi")
-(pr-str "\\"")
-(println "\\"")
-(println "abc  def" "ghi jkl")
-(println "\\"")
-(str "\\"")
 (println "abc\\ndef\\nghi")\n
 (str "\\"")
 (println "\\"")
@@ -99,3 +60,42 @@ aa
 inc4
 (load-file "../tests/incA.mal")
 inc4
+(def! fib (fn* (N) (if (= N 0) 1 (if (= N 1) 1 (+ (fib (- N 1)) (fib (- N 2)))))))
+(fib 2)
+(let* (b 12) (do (eval (read-string "(def! aa 7)")) aa ))
+(let* (a 2) (eval (read-string "a")))
+(def! a 1)
+(let* (a 2) (eval (read-string "a")))
+(let* (b 12) (do (eval (read-string "(def! aa 7)")) aa ))
+aa
+(let* (a 2) (eval (read-string "a")))
+a
+(def! a 1)
+a
+(let* (a 2) (eval (read-string "a")))
+a
+(let* (a 2) (eval (read-string "a")))
+(def! a 1)
+a
+(let* (a 2) a)
+a
+(let* (a 2) a)
+a
+(def! a 1)
+a
+(let* (a 2) a)
+a
+(def! b 5)
+b
+(let* (a 2) a)
+b
+(def! a 1)
+(let* (a 2) a)
+a
+(let* (a 2) (eval (read-string "a")))
+a
+(def! a 1)
+a
+(let* (a 2) (eval (read-string "a")))
+(let* (b 12) (do (eval (read-string "(def! aa 7)")) aa ))
+aa

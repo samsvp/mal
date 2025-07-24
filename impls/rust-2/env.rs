@@ -32,4 +32,12 @@ impl Env {
             self.outer.as_ref().map_or(None, |o| o.get(key))
         )
     }
+
+    pub fn outer(&self) -> Env {
+        let mut mut_env = self;
+        while let Some(outer) = &mut_env.outer {
+            mut_env = outer;
+        }
+        mut_env.clone()
+    }
 }
