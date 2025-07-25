@@ -8,17 +8,37 @@ pub const MalType = union(enum) {
     int: i32,
     float: f32,
     list: std.ArrayListUnmanaged(MalType),
-    array: std.ArrayListUnmanaged(MalType),
+    vector: std.ArrayListUnmanaged(MalType),
 
-    pub fn toString(self: MalType) []const u8 {
-        return switch (self) {
-            inline .symbol, .keyword, .string => |s| s,
-            .nil => "nil",
-            .list => |l| lst_blk: {
-                std.debug.print("Length {d}\n", .{l.items.len});
-                break :lst_blk "I'm a list";
+    pub fn toString(self: MalType, allocator: std.mem.Allocator) ![]const u8 {
+        var buffer = std.ArrayList(u8).init(allocator);
+        try self.toStringInternal(&buffer);
+        return try buffer.toOwnedSlice();
+    }
+
+    fn toStringInternal(self: MalType, buffer: *std.ArrayList(u8)) !void {
+        switch (self) {
+            .symbol, .keyword => |s| try buffer.appendSlice(s),
+            .string => |s| try std.fmt.format(buffer.writer(), "\"{s}\"", .{s}),
+            .nil => try buffer.appendSlice("nil"),
+            .int => |i| try std.fmt.format(buffer.writer(), "{}", .{i}),
+            .float => |f| try std.fmt.format(buffer.writer(), "{}", .{f}),
+            .list => |l| {
+                try buffer.appendSlice("(");
+                for (l.items, 0..) |item, i| {
+                    if (i > 0) try buffer.append(' ');
+                    try item.toStringInternal(buffer);
+                }
+                try buffer.appendSlice(")");
             },
-            else => "Not implemented",
-        };
+            .vector => |a| {
+                try buffer.appendSlice("[");
+                for (a.items, 0..) |item, i| {
+                    if (i > 0) try buffer.append(' ');
+                    try item.toStringInternal(buffer);
+                }
+                try buffer.appendSlice("]");
+            },
+        }
     }
 };

@@ -137,10 +137,36 @@ fn tokenize(
     return list;
 }
 
-fn readAtom(allocator: std.mem.Allocator, reader: *Reader) !MalType {
+fn readAtom(
+    allocator: std.mem.Allocator,
+    reader: *Reader,
+) error{
+    EOFStringReadError,
+    OutOfMemory,
+}!MalType {
     const atom = reader.next().?;
+    if (atom.len == 0) {
+        return .{ .nil = undefined };
+    }
 
     return switch (atom[0]) {
+        '"' => str_blk: {
+            if (atom.len < 2 or atom[atom.len - 1] != '"') {
+                break :str_blk error.EOFStringReadError;
+            }
+
+            var backslash_amount: usize = 0;
+            var i: usize = atom.len - 2;
+            while (i != 0 and atom[i] == '\\') {
+                i -= 1;
+                backslash_amount += 1;
+            }
+            if (backslash_amount % 2 != 0) {
+                break :str_blk error.EOFStringReadError;
+            }
+            const str = try std.mem.Allocator.dupe(allocator, u8, atom[1 .. atom.len - 1]);
+            break :str_blk .{ .string = str };
+        },
         else => blk: {
             const maybe_num = std.fmt.parseInt(i32, atom, 10) catch null;
             if (maybe_num) |num| {
@@ -157,25 +183,40 @@ fn readAtom(allocator: std.mem.Allocator, reader: *Reader) !MalType {
     };
 }
 
-fn readList(allocator: std.mem.Allocator, reader: *Reader) MalType {
+const CollectionType = enum {
+    list,
+    vector,
+};
+fn readCollection(
+    allocator: std.mem.Allocator,
+    reader: *Reader,
+    collection_type: CollectionType,
+) error{
+    EOFCollectionReadError,
+    EOFStringReadError,
+    OutOfMemory,
+}!MalType {
     var list: std.ArrayListUnmanaged(MalType) = .empty;
     // TODO! some types may allocate memory that needs cleaning (e.g. a list inside a list allocates memory)
     errdefer list.deinit(allocator);
 
+    const close_bracket = switch (collection_type) {
+        .list => ")",
+        .vector => "]",
+    };
     _ = reader.next();
     while (reader.peek()) |token| {
-        if (std.mem.eql(u8, token, ")")) {
-            return .{ .list = list };
+        if (std.mem.eql(u8, token, close_bracket)) {
+            _ = reader.next();
+            return switch (collection_type) {
+                .list => .{ .list = list },
+                .vector => .{ .vector = list },
+            };
         }
-        const val = readForm(allocator, reader) catch unreachable;
-        list.append(allocator, val) catch unreachable;
+        const val = try readForm(allocator, reader);
+        try list.append(allocator, val);
     }
-    return .{ .nil = undefined };
-}
-
-fn readVector(reader: *Reader) !MalType {
-    _ = reader;
-    return .{ .nil = undefined };
+    return error.EOFCollectionReadError;
 }
 
 fn readForm(allocator: std.mem.Allocator, reader: *Reader) !MalType {
@@ -190,8 +231,9 @@ fn readForm(allocator: std.mem.Allocator, reader: *Reader) !MalType {
     }
 
     return switch (token[0]) {
-        '(' => readList(allocator, reader),
-        else => readAtom(allocator, reader),
+        '(' => try readCollection(allocator, reader, .list),
+        '[' => try readCollection(allocator, reader, .vector),
+        else => try readAtom(allocator, reader),
     };
 }
 

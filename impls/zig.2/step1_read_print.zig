@@ -4,25 +4,29 @@ const Linenoise = @import("linenoize").Linenoise;
 const MalType = @import("types.zig").MalType;
 const Reader = @import("reader.zig");
 
-fn read(allocator: std.mem.Allocator, s: []const u8) MalType {
-    return Reader.readStr(allocator, s) catch @panic("wat");
+fn read(allocator: std.mem.Allocator, s: []const u8) !MalType {
+    return try Reader.readStr(allocator, s);
 }
 
-fn eval(s: MalType) MalType {
+fn eval(allocator: std.mem.Allocator, s: MalType) MalType {
+    _ = allocator;
     return s;
 }
 
-fn print(s: MalType) []const u8 {
-    return s.toString();
+fn print(allocator: std.mem.Allocator, s: MalType) []const u8 {
+    return s.toString(allocator) catch "Could not build string.";
 }
 
-fn rep(allocator: std.mem.Allocator, s: []const u8) []const u8 {
+fn rep(allocator: std.mem.Allocator, s: []const u8) ![]const u8 {
+    const val = try read(
+        allocator,
+        s,
+    );
     return print(
+        allocator,
         eval(
-            read(
-                allocator,
-                s,
-            ),
+            allocator,
+            val,
         ),
     );
 }
@@ -38,7 +42,12 @@ pub fn main() !void {
 
     while (try ln.linenoise("user> ")) |input| {
         defer allocator.free(input);
-        const res = rep(allocator, input);
+        const res = rep(allocator, input) catch |err| {
+            try stdout.print("{any}\n", .{err});
+            continue;
+        };
+        defer allocator.free(res);
+
         try stdout.print("{s}\n", .{res});
         try ln.history.add(input);
     }
