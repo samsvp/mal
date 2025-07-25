@@ -18,9 +18,8 @@ pub fn build(b: *Builder) void {
     const linenoize = b.dependency("linenoize", .{}).module("linenoise");
     exe.root_module.addImport("linenoize", linenoize);
 
-    //exe.linkSystemLibrary("c");
-    //exe.linkSystemLibrary("pcre");
-    //exe.linkSystemLibrary("readline");
+    exe.linkSystemLibrary("c");
+    exe.linkSystemLibrary("pcre2-8");
     b.default_step.dependOn(&exe.step);
     b.installArtifact(exe);
 }
