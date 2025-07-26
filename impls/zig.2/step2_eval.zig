@@ -57,18 +57,16 @@ fn print(allocator: std.mem.Allocator, s: MalType) []const u8 {
 }
 
 fn rep(allocator: std.mem.Allocator, s: []const u8, env: *Env) ![]const u8 {
-    const val = try read(
+    var val = try read(
         allocator,
         s,
     );
-    return print(
-        allocator,
-        eval(
-            allocator,
-            val,
-            env,
-        ),
-    );
+    defer val.deinit(allocator);
+
+    var t = eval(allocator, val, env);
+    defer t.deinit(allocator);
+
+    return print(allocator, t);
 }
 
 pub fn main() !void {
@@ -76,6 +74,11 @@ pub fn main() !void {
 
     var gpa = std.heap.DebugAllocator(.{}){};
     const allocator = gpa.allocator();
+
+    defer {
+        const deinit_status = gpa.deinit();
+        if (deinit_status == .leak) std.debug.print("WARNING: memory leaked\n", .{});
+    }
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();

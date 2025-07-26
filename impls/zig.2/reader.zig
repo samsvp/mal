@@ -182,7 +182,7 @@ fn readAtom(
             }
 
             if (atom.len == 3 and std.mem.eql(u8, atom, "nil")) {
-                return .{ .nil = undefined };
+                return .nil;
             }
 
             const atom_str = try std.mem.Allocator.dupe(allocator, u8, atom);

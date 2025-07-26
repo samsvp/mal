@@ -4,7 +4,7 @@ pub const MalType = union(enum) {
     string: String,
     keyword: []const u8,
     symbol: []const u8,
-    nil: void,
+    nil,
     int: i32,
     float: f32,
     list: std.ArrayListUnmanaged(MalType),
@@ -88,6 +88,24 @@ pub const MalType = union(enum) {
             },
             .function => try buffer.appendSlice("#<function>"),
             .builtin => try buffer.appendSlice("#<function><builtin>"),
+        }
+    }
+
+    pub fn deinit(self: *MalType, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            MalType.list, MalType.vector => |*list| {
+                defer list.deinit(allocator);
+                for (list.items) |*item| {
+                    item.deinit(allocator);
+                }
+            },
+            MalType.string, MalType.err => |*s| {
+                s.deinit(allocator);
+            },
+            MalType.keyword, MalType.symbol => |s| {
+                allocator.free(s);
+            },
+            else => return,
         }
     }
 };
