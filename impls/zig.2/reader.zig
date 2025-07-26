@@ -10,6 +10,7 @@ const PCRE2_ZERO_TERMINATED = ~@as(pcre.PCRE2_SIZE, 0);
 
 var g_regex: ?*pcre.pcre2_code_8 = null;
 
+/// Wrapper that holds the raw tokens (strings) of a Lisp expression (which may not be valid).
 const TokenList = struct {
     tokens: std.ArrayListUnmanaged([]const u8),
 
@@ -31,6 +32,7 @@ const TokenList = struct {
     }
 };
 
+/// A helper token reader.
 pub const Reader = struct {
     token_list: TokenList,
     current: usize,
@@ -245,6 +247,7 @@ fn readForm(allocator: std.mem.Allocator, reader: *Reader) !MalType {
     };
 }
 
+/// Transforms a string into a lisp expression.
 pub fn readStr(
     allocator: std.mem.Allocator,
     subject: []const u8,

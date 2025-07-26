@@ -1,5 +1,6 @@
 const std = @import("std");
 
+/// Enum holding all of our Lisp types.
 pub const MalType = union(enum) {
     string: String,
     keyword: []const u8,
@@ -13,6 +14,7 @@ pub const MalType = union(enum) {
     function: MalFn,
     builtin: *const fn (allocator: std.mem.Allocator, args: []MalType) MalType,
 
+    /// A basic string type which is basically a wrapper with helper functions to concatenate string and handle its memory.
     pub const String = struct {
         chars: std.ArrayListUnmanaged(u8),
 
@@ -44,6 +46,7 @@ pub const MalType = union(enum) {
         }
     };
 
+    /// A basic type to define user made functions
     pub const MalFn = struct {
         ast: *MalType,
         args: [][]const u8,
@@ -93,6 +96,9 @@ pub const MalType = union(enum) {
 
     pub fn deinit(self: *MalType, allocator: std.mem.Allocator) void {
         switch (self.*) {
+            // It would actually be way better if all of the data of a list were stored sequentially, without the need
+            // of a for loop. I would need to rewrite the whole structure of the data though. This is something to keep in
+            // mind, though.
             MalType.list, MalType.vector => |*list| {
                 defer list.deinit(allocator);
                 for (list.items) |*item| {
