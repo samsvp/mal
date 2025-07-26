@@ -10,6 +10,13 @@ const PCRE2_ZERO_TERMINATED = ~@as(pcre.PCRE2_SIZE, 0);
 
 var g_regex: ?*pcre.pcre2_code_8 = null;
 
+pub const ParserError = error{
+    EOFCollectionReadError,
+    EOFStringReadError,
+    OutOfMemory,
+    UnhashableKey,
+};
+
 /// Wrapper that holds the raw tokens (strings) of a Lisp expression (which may not be valid).
 const TokenList = struct {
     tokens: std.ArrayListUnmanaged([]const u8),
@@ -142,10 +149,7 @@ fn tokenize(
 fn readAtom(
     allocator: std.mem.Allocator,
     reader: *Reader,
-) error{
-    EOFStringReadError,
-    OutOfMemory,
-}!MalType {
+) ParserError!MalType {
     const atom = reader.next().?;
     if (atom.len == 0) {
         return .nil;
@@ -153,12 +157,14 @@ fn readAtom(
 
     return switch (atom[0]) {
         ':' => colon_blk: {
-            const str = try std.mem.Allocator.dupe(allocator, u8, atom);
+            const str = std.mem.Allocator.dupe(allocator, u8, atom) catch {
+                return ParserError.OutOfMemory;
+            };
             break :colon_blk .{ .keyword = str };
         },
         '"' => str_blk: {
             if (atom.len < 2 or atom[atom.len - 1] != '"') {
-                break :str_blk error.EOFStringReadError;
+                break :str_blk ParserError.EOFStringReadError;
             }
 
             var backslash_amount: usize = 0;
@@ -168,9 +174,11 @@ fn readAtom(
                 backslash_amount += 1;
             }
             if (backslash_amount % 2 != 0) {
-                break :str_blk error.EOFStringReadError;
+                break :str_blk ParserError.EOFStringReadError;
             }
-            const str = try MalType.String.initFrom(allocator, atom[1 .. atom.len - 1]);
+            const str = MalType.String.initFrom(allocator, atom[1 .. atom.len - 1]) catch {
+                return ParserError.OutOfMemory;
+            };
             break :str_blk .{ .string = str };
         },
         else => blk: {
@@ -187,7 +195,9 @@ fn readAtom(
                 return .nil;
             }
 
-            const atom_str = try std.mem.Allocator.dupe(allocator, u8, atom);
+            const atom_str = std.mem.Allocator.dupe(allocator, u8, atom) catch {
+                return ParserError.OutOfMemory;
+            };
             break :blk .{ .symbol = atom_str };
         },
     };
@@ -201,14 +211,12 @@ fn readCollection(
     allocator: std.mem.Allocator,
     reader: *Reader,
     collection_type: CollectionType,
-) error{
-    EOFCollectionReadError,
-    EOFStringReadError,
-    OutOfMemory,
-}!MalType {
+) ParserError!MalType {
     var list: std.ArrayListUnmanaged(MalType) = .empty;
-    // TODO! some types may allocate memory that needs cleaning (e.g. a list inside a list allocates memory)
-    errdefer list.deinit(allocator);
+    errdefer {
+        var m_list = MalType{ .list = list };
+        m_list.deinit(allocator);
+    }
 
     const close_bracket = switch (collection_type) {
         .list => ")",
@@ -224,9 +232,41 @@ fn readCollection(
             };
         }
         const val = try readForm(allocator, reader);
-        try list.append(allocator, val);
+        list.append(allocator, val) catch {
+            return ParserError.OutOfMemory;
+        };
     }
-    return error.EOFCollectionReadError;
+    return ParserError.EOFCollectionReadError;
+}
+
+fn readDict(allocator: std.mem.Allocator, reader: *Reader) ParserError!MalType {
+    var dict = MalType.Dict.init();
+    errdefer {
+        var m_dict = MalType{ .dict = dict };
+        m_dict.deinit(allocator);
+    }
+    errdefer dict.values.deinit(allocator);
+
+    var maybe_key: ?MalType = null;
+    _ = reader.next();
+    while (reader.peek()) |token| {
+        if (std.mem.eql(u8, token, "}")) {
+            _ = reader.next();
+            if (maybe_key) |_| {
+                return ParserError.EOFCollectionReadError;
+            }
+            return .{ .dict = dict };
+        }
+        const val = try readForm(allocator, reader);
+        if (maybe_key) |key| {
+            switch (dict.add(allocator, key, val)) {
+                .err => return ParserError.UnhashableKey,
+                else => {},
+            }
+            maybe_key = null;
+        } else maybe_key = val;
+    }
+    return ParserError.EOFCollectionReadError;
 }
 
 fn readForm(allocator: std.mem.Allocator, reader: *Reader) !MalType {
@@ -243,6 +283,7 @@ fn readForm(allocator: std.mem.Allocator, reader: *Reader) !MalType {
     return switch (token[0]) {
         '(' => try readCollection(allocator, reader, .list),
         '[' => try readCollection(allocator, reader, .vector),
+        '{' => try readDict(allocator, reader),
         else => try readAtom(allocator, reader),
     };
 }

@@ -1,7 +1,7 @@
 #!/bin/python3
 
+import os
 import subprocess
-import sys
 import argparse
 
 commands = {
@@ -15,7 +15,9 @@ def build(step: int):
     subprocess.run(["zig", "build", f"-Dname={command}", f"-Droot_source_file={command}.zig"])
 
 def run(step: int):
-    subprocess.run(["./run"])
+    current_env = os.environ.copy()
+    current_env["STEP"] = commands[step]
+    subprocess.run(["./run"], env=current_env)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-b', '--build', action='store_true')

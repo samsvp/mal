@@ -48,6 +48,36 @@ fn eval(allocator: std.mem.Allocator, s: MalType, env: *Env) MalType {
             }
             return .{ .vector = vec };
         },
+        // this cloning should change when implementing a reference counter for the mal types.
+        .dict => |dict| {
+            var new_dict = MalType.Dict.init();
+
+            var iter = dict.values.iterator();
+            while (iter.next()) |entry| {
+                var key = entry.key_ptr.clone(allocator);
+                var value = entry.value_ptr.clone(allocator);
+                const new_key = eval(allocator, key, env);
+                const new_value = eval(allocator, value, env);
+
+                const ret = new_dict.add(allocator, new_key, new_value);
+                switch (ret) {
+                    .err => {
+                        new_dict.deinit(allocator);
+                        return ret;
+                    },
+                    else => {},
+                }
+
+                // deallocate old values if new ones were created
+                if (!new_key.eql(key)) {
+                    key.deinit(allocator);
+                }
+                if (!new_value.eql(value)) {
+                    value.deinit(allocator);
+                }
+            }
+            return .{ .dict = new_dict };
+        },
         else => s,
     };
 }
@@ -64,9 +94,17 @@ fn rep(allocator: std.mem.Allocator, s: []const u8, env: *Env) ![]const u8 {
     defer val.deinit(allocator);
 
     var t = eval(allocator, val, env);
-    defer t.deinit(allocator);
-
-    return print(allocator, t);
+    const str = print(allocator, t);
+    // Must implement a reference counter
+    if (!val.eql(t)) {
+        t.deinit(allocator);
+    } else {
+        switch (t) {
+            .dict, .vector, .list => t.deinit(allocator),
+            else => {},
+        }
+    }
+    return str;
 }
 
 pub fn main() !void {
