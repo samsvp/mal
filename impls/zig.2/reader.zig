@@ -150,6 +150,10 @@ fn readAtom(
     }
 
     return switch (atom[0]) {
+        ':' => colon_blk: {
+            const str = try std.mem.Allocator.dupe(allocator, u8, atom);
+            break :colon_blk .{ .keyword = str };
+        },
         '"' => str_blk: {
             if (atom.len < 2 or atom[atom.len - 1] != '"') {
                 break :str_blk error.EOFStringReadError;
@@ -164,7 +168,7 @@ fn readAtom(
             if (backslash_amount % 2 != 0) {
                 break :str_blk error.EOFStringReadError;
             }
-            const str = try std.mem.Allocator.dupe(allocator, u8, atom[1 .. atom.len - 1]);
+            const str = try MalType.String.initFrom(allocator, atom[1 .. atom.len - 1]);
             break :str_blk .{ .string = str };
         },
         else => blk: {
@@ -175,6 +179,10 @@ fn readAtom(
             const maybe_float = std.fmt.parseFloat(f32, atom) catch null;
             if (maybe_float) |float| {
                 break :blk .{ .float = float };
+            }
+
+            if (atom.len == 3 and std.mem.eql(u8, atom, "nil")) {
+                return .{ .nil = undefined };
             }
 
             const atom_str = try std.mem.Allocator.dupe(allocator, u8, atom);

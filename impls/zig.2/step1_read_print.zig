@@ -40,6 +40,11 @@ pub fn main() !void {
     var ln = Linenoise.init(allocator);
     defer ln.deinit();
 
+    ln.history.load("history.txt") catch {};
+    defer ln.history.save("history.txt") catch |err| {
+        std.debug.print("Failed to print history {any}\n", .{err});
+    };
+
     while (try ln.linenoise("user> ")) |input| {
         defer allocator.free(input);
         const res = rep(allocator, input) catch |err| {
