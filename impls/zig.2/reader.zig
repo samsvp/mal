@@ -146,7 +146,7 @@ fn readAtom(
 }!MalType {
     const atom = reader.next().?;
     if (atom.len == 0) {
-        return .{ .nil = undefined };
+        return .nil;
     }
 
     return switch (atom[0]) {
@@ -230,12 +230,12 @@ fn readCollection(
 fn readForm(allocator: std.mem.Allocator, reader: *Reader) !MalType {
     const maybe_token = reader.peek();
     if (maybe_token == null) {
-        return .{ .nil = undefined };
+        return .nil;
     }
 
     const token = maybe_token.?;
     if (token.len == 0) {
-        return .{ .nil = undefined };
+        return .nil;
     }
 
     return switch (token[0]) {

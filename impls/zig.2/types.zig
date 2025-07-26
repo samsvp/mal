@@ -51,7 +51,7 @@ pub const MalType = union(enum) {
 
     pub fn makeError(allocator: std.mem.Allocator, msg: []const u8) MalType {
         const err_msg = MalType.String.initFrom(allocator, msg) catch {
-            return .{ .nil = undefined };
+            return .nil;
         };
         return .{ .err = err_msg };
     }
