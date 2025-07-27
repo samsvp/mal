@@ -1,5 +1,6 @@
 const std = @import("std");
 const MalType = @import("types.zig").MalType;
+const PageShared = @import("shared.zig").PageShared;
 
 const pcre = @cImport({
     @cDefine("PCRE2_CODE_UNIT_WIDTH", "8");
@@ -157,10 +158,13 @@ fn readAtom(
 
     return switch (atom[0]) {
         ':' => colon_blk: {
-            const str = std.mem.Allocator.dupe(allocator, u8, atom) catch {
+            const str = MalType.String.initFrom(allocator, atom) catch {
                 return ParserError.OutOfMemory;
             };
-            break :colon_blk .{ .keyword = str };
+            const mal_str = PageShared(MalType.String).init(str) catch {
+                return ParserError.OutOfMemory;
+            };
+            break :colon_blk .{ .keyword = mal_str };
         },
         '"' => str_blk: {
             if (atom.len < 2 or atom[atom.len - 1] != '"') {
@@ -179,7 +183,10 @@ fn readAtom(
             const str = MalType.String.initFrom(allocator, atom[1 .. atom.len - 1]) catch {
                 return ParserError.OutOfMemory;
             };
-            break :str_blk .{ .string = str };
+            const mal_str = PageShared(MalType.String).init(str) catch {
+                return ParserError.OutOfMemory;
+            };
+            break :str_blk .{ .string = mal_str };
         },
         else => blk: {
             const maybe_num = std.fmt.parseInt(i32, atom, 10) catch null;
@@ -195,10 +202,13 @@ fn readAtom(
                 return .nil;
             }
 
-            const atom_str = std.mem.Allocator.dupe(allocator, u8, atom) catch {
+            const str = MalType.String.initFrom(allocator, atom) catch {
                 return ParserError.OutOfMemory;
             };
-            break :blk .{ .symbol = atom_str };
+            const mal_str = PageShared(MalType.String).init(str) catch {
+                return ParserError.OutOfMemory;
+            };
+            break :blk .{ .symbol = mal_str };
         },
     };
 }
@@ -214,8 +224,9 @@ fn readCollection(
 ) ParserError!MalType {
     var list: std.ArrayListUnmanaged(MalType) = .empty;
     errdefer {
-        var m_list = MalType{ .list = list };
-        m_list.deinit(allocator);
+        const arr = PageShared(MalType.Array).init(list) catch unreachable;
+        var m_list = MalType{ .list = arr };
+        m_list.deinit(allocator) catch unreachable;
     }
 
     const close_bracket = switch (collection_type) {
@@ -226,9 +237,10 @@ fn readCollection(
     while (reader.peek()) |token| {
         if (std.mem.eql(u8, token, close_bracket)) {
             _ = reader.next();
+            const arr = PageShared(MalType.Array).init(list) catch unreachable;
             return switch (collection_type) {
-                .list => .{ .list = list },
-                .vector => .{ .vector = list },
+                .list => .{ .list = arr },
+                .vector => .{ .vector = arr },
             };
         }
         const val = try readForm(allocator, reader);
@@ -242,8 +254,9 @@ fn readCollection(
 fn readDict(allocator: std.mem.Allocator, reader: *Reader) ParserError!MalType {
     var dict = MalType.Dict.init();
     errdefer {
-        var m_dict = MalType{ .dict = dict };
-        m_dict.deinit(allocator);
+        const d = PageShared(MalType.Dict).init(dict) catch unreachable;
+        var m_dict = MalType{ .dict = d };
+        m_dict.deinit(allocator) catch unreachable;
     }
     errdefer dict.values.deinit(allocator);
 
@@ -255,7 +268,8 @@ fn readDict(allocator: std.mem.Allocator, reader: *Reader) ParserError!MalType {
             if (maybe_key) |_| {
                 return ParserError.EOFCollectionReadError;
             }
-            return .{ .dict = dict };
+            const d = PageShared(MalType.Dict).init(dict) catch unreachable;
+            return .{ .dict = d };
         }
         const val = try readForm(allocator, reader);
         if (maybe_key) |key| {

@@ -39,6 +39,14 @@ pub fn Shared(comptime T: type) type {
             };
         }
 
+        pub fn get(self: Self) T {
+            return self.ptr.item.*;
+        }
+
+        pub fn getPtr(self: Self) *T {
+            return self.ptr.item;
+        }
+
         pub fn clone(self: *Self) !Self {
             if (self.is_released) {
                 return SharedErrors.ResourceReleased;
@@ -88,6 +96,14 @@ pub fn PageShared(comptime T: type) type {
         pub fn init(item: T) !Self {
             const shared: Shared(T) = try .init(std.heap.page_allocator, item);
             return .{ .shared = shared };
+        }
+
+        pub fn get(self: Self) T {
+            return self.shared.get();
+        }
+
+        pub fn getPtr(self: Self) *T {
+            return self.shared.getPtr();
         }
 
         pub fn clone(self: *Self) !Self {

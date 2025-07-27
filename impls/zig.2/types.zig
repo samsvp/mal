@@ -1,19 +1,22 @@
 const std = @import("std");
+const PageShared = @import("shared.zig").PageShared;
 
 /// Enum holding all of our Lisp types.
 pub const MalType = union(enum) {
-    string: String,
-    keyword: []const u8,
-    symbol: []const u8,
+    string: PageShared(String),
+    keyword: PageShared(String),
+    symbol: PageShared(String),
     nil,
     int: i32,
     float: f32,
-    list: std.ArrayListUnmanaged(MalType),
-    vector: std.ArrayListUnmanaged(MalType),
-    err: String,
-    dict: Dict,
+    list: PageShared(std.ArrayListUnmanaged(MalType)),
+    vector: PageShared(std.ArrayListUnmanaged(MalType)),
+    err: PageShared(String),
+    dict: PageShared(Dict),
     function: Fn,
     builtin: *const fn (allocator: std.mem.Allocator, args: []MalType) MalType,
+
+    pub const Array = std.ArrayListUnmanaged(MalType);
 
     /// A basic string type which is basically a wrapper with helper functions to concatenate string and handle its memory.
     pub const String = struct {
@@ -77,8 +80,8 @@ pub const MalType = union(enum) {
             defer self.values.deinit(allocator);
             var iter = self.values.iterator();
             while (iter.next()) |entry| {
-                entry.key_ptr.deinit(allocator);
-                entry.value_ptr.deinit(allocator);
+                entry.key_ptr.deinit(allocator) catch {};
+                entry.value_ptr.deinit(allocator) catch {};
             }
         }
 
@@ -87,8 +90,7 @@ pub const MalType = union(enum) {
                 var h: std.hash.Wyhash = .init(0);
                 const b = switch (value) {
                     .int => |i| std.mem.asBytes(&i),
-                    .string => |s| s.getStr(),
-                    .keyword => |s| s,
+                    .string, .keyword => |s| s.get().getStr(),
                     else => "0",
                 };
                 h.update(b);
@@ -105,61 +107,19 @@ pub const MalType = union(enum) {
         const err_msg = MalType.String.initFrom(allocator, msg) catch {
             return .nil;
         };
-        return .{ .err = err_msg };
+        const err = PageShared(String).init(err_msg) catch {
+            return .nil;
+        };
+        return .{ .err = err };
     }
 
-    pub fn clone(self: MalType, allocator: std.mem.Allocator) MalType {
-        switch (self) {
-            .string => |s| {
-                const new_s = String.initFrom(allocator, s.getStr()) catch {
-                    return makeError(allocator, "Could not create string, OOM");
-                };
-                return .{ .string = new_s };
-            },
-            .err => |s| {
-                const new_s = String.initFrom(allocator, s.getStr()) catch {
-                    return makeError(allocator, "Could not create string, OOM");
-                };
-                return .{ .err = new_s };
-            },
-            .keyword => |s| {
-                const new_k = std.mem.Allocator.dupe(allocator, u8, s) catch {
-                    return makeError(allocator, "Could not create string, OOM");
-                };
-                return .{ .keyword = new_k };
-            },
-            .symbol => |s| {
-                const new_s = std.mem.Allocator.dupe(allocator, u8, s) catch {
-                    return makeError(allocator, "Could not create string, OOM");
-                };
-                return .{ .symbol = new_s };
-            },
-            .list => |list| {
-                var new_list: std.ArrayListUnmanaged(MalType) = .empty;
-                for (list.items) |item| {
-                    const new_item = item.clone(allocator);
-                    new_list.append(allocator, new_item) catch unreachable;
-                }
-                return .{ .list = new_list };
-            },
-            .vector => |vector| {
-                var vector_list: std.ArrayListUnmanaged(MalType) = .empty;
-                for (vector.items) |item| {
-                    const new_item = item.clone(allocator);
-                    vector_list.append(allocator, new_item) catch unreachable;
-                }
-                return .{ .vector = vector_list };
-            },
-            .dict => |dict| {
-                var new_dict = Dict.init();
-                var iter = dict.values.iterator();
-                while (iter.next()) |entry| {
-                    _ = new_dict.add(allocator, entry.key_ptr.clone(allocator), entry.value_ptr.clone(allocator));
-                }
-                return .{ .dict = new_dict };
-            },
+    pub fn clone(self: *MalType) !MalType {
+        return switch (self.*) {
+            MalType.string, MalType.err, MalType.keyword, MalType.symbol => |*s| try s.clone(),
+            MalType.list, MalType.vector => |*l| try l.clone(),
+            MalType.dict => |*d| try d.clone(),
             else => return self,
-        }
+        };
     }
 
     pub fn eql(a: MalType, b: MalType) bool {
@@ -173,21 +133,25 @@ pub const MalType = union(enum) {
                 else => false,
             },
             .string => |s1| switch (b) {
-                .string => |s2| std.mem.eql(u8, s1.getStr(), s2.getStr()),
+                .string => |s2| std.mem.eql(u8, s1.get().getStr(), s2.get().getStr()),
                 else => false,
             },
             .err => |s1| switch (b) {
-                .err => |s2| std.mem.eql(u8, s1.getStr(), s2.getStr()),
+                .err => |s2| std.mem.eql(u8, s1.get().getStr(), s2.get().getStr()),
+                else => false,
+            },
+            .symbol => |s1| switch (b) {
+                .symbol => |s2| std.mem.eql(u8, s1.get().getStr(), s2.get().getStr()),
                 else => false,
             },
             .keyword => |s1| switch (b) {
-                .keyword => |s2| std.mem.eql(u8, s1, s2),
+                .keyword => |s2| std.mem.eql(u8, s1.get().getStr(), s2.get().getStr()),
                 else => false,
             },
             .list => |l1| switch (b) {
                 .list => |l2| {
-                    if (l1.items.len != l2.items.len) return false;
-                    for (l1.items, l2.items) |v1, v2| {
+                    if (l1.get().items.len != l2.get().items.len) return false;
+                    for (l1.get().items, l2.get().items) |v1, v2| {
                         if (!v1.eql(v2)) {
                             return false;
                         }
@@ -198,8 +162,8 @@ pub const MalType = union(enum) {
             },
             .vector => |l1| switch (b) {
                 .vector => |l2| {
-                    if (l1.items.len != l2.items.len) return false;
-                    for (l1.items, l2.items) |v1, v2| {
+                    if (l1.get().items.len != l2.get().items.len) return false;
+                    for (l1.get().items, l2.get().items) |v1, v2| {
                         if (!v1.eql(v2)) {
                             return false;
                         }
@@ -210,10 +174,10 @@ pub const MalType = union(enum) {
             },
             .dict => |d1| switch (b) {
                 .dict => |d2| {
-                    if (d1.values.size != d2.values.size) return false;
-                    var iter = d1.values.iterator();
+                    if (d1.get().values.size != d2.get().values.size) return false;
+                    var iter = d1.get().values.iterator();
                     while (iter.next()) |entry| {
-                        if (d2.values.get(entry.key_ptr.*)) |val| {
+                        if (d2.get().values.get(entry.key_ptr.*)) |val| {
                             if (!val.eql(entry.value_ptr.*)) return false;
                         } else return false;
                     }
@@ -225,7 +189,7 @@ pub const MalType = union(enum) {
                 .nil => true,
                 else => false,
             },
-            .function, .builtin, .symbol => false,
+            .function, .builtin => false,
         };
     }
 
@@ -237,15 +201,15 @@ pub const MalType = union(enum) {
 
     fn toStringInternal(self: MalType, buffer: *std.ArrayList(u8)) !void {
         switch (self) {
-            .symbol, .keyword => |s| try buffer.appendSlice(s),
-            .string => |s| try std.fmt.format(buffer.writer(), "\"{s}\"", .{s.getStr()}),
-            .err => |s| try std.fmt.format(buffer.writer(), "ERROR: {s}", .{s.getStr()}),
+            .symbol, .keyword => |s| try buffer.appendSlice(s.get().getStr()),
+            .string => |s| try std.fmt.format(buffer.writer(), "\"{s}\"", .{s.get().getStr()}),
+            .err => |s| try std.fmt.format(buffer.writer(), "ERROR: {s}", .{s.get().getStr()}),
             .nil => try buffer.appendSlice("nil"),
             .int => |i| try std.fmt.format(buffer.writer(), "{}", .{i}),
             .float => |f| try std.fmt.format(buffer.writer(), "{}", .{f}),
             .list => |l| {
                 try buffer.appendSlice("(");
-                for (l.items, 0..) |item, i| {
+                for (l.get().items, 0..) |item, i| {
                     if (i > 0) try buffer.append(' ');
                     try item.toStringInternal(buffer);
                 }
@@ -253,7 +217,7 @@ pub const MalType = union(enum) {
             },
             .vector => |a| {
                 try buffer.appendSlice("[");
-                for (a.items, 0..) |item, i| {
+                for (a.get().items, 0..) |item, i| {
                     if (i > 0) try buffer.append(' ');
                     try item.toStringInternal(buffer);
                 }
@@ -261,7 +225,7 @@ pub const MalType = union(enum) {
             },
             .dict => |d| {
                 try buffer.appendSlice("{");
-                var iter = d.values.iterator();
+                var iter = d.get().values.iterator();
                 while (iter.next()) |entry| {
                     try entry.key_ptr.toStringInternal(buffer);
                     try buffer.appendSlice(" ");
@@ -274,25 +238,22 @@ pub const MalType = union(enum) {
         }
     }
 
-    pub fn deinit(self: *MalType, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *MalType, allocator: std.mem.Allocator) !void {
         switch (self.*) {
             // It would actually be way better if all of the data of a list were stored sequentially, without the need
             // of a for loop. I would need to rewrite the whole structure of the data though. This is something to keep in
             // mind, though.
             MalType.list, MalType.vector => |*list| {
-                defer list.deinit(allocator);
-                for (list.items) |*item| {
-                    item.deinit(allocator);
+                for (list.get().items) |*item| {
+                    try item.deinit(allocator);
                 }
+                try list.deinit(allocator);
             },
             MalType.dict => |*d| {
-                d.deinit(allocator);
+                try d.deinit(allocator);
             },
-            MalType.string, MalType.err => |*s| {
-                s.deinit(allocator);
-            },
-            MalType.keyword, MalType.symbol => |s| {
-                allocator.free(s);
+            MalType.string, MalType.err, MalType.keyword, MalType.symbol => |*s| {
+                try s.deinit(allocator);
             },
             else => return,
         }
