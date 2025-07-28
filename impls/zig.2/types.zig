@@ -241,6 +241,18 @@ pub const MalType = union(enum) {
         return .{ .err = err_msg.string };
     }
 
+    pub fn makeErrorF(allocator: std.mem.Allocator, comptime msg: []const u8, args: anytype) MalType {
+        var buffer = std.ArrayList(u8).init(allocator);
+        std.fmt.format(buffer.writer(), msg, args) catch {};
+        const m = buffer.toOwnedSlice() catch unreachable;
+        defer allocator.free(m);
+
+        const err_msg = MalType.String.initFrom(allocator, m) catch {
+            return .nil;
+        };
+        return .{ .err = err_msg.string };
+    }
+
     pub fn clone(self: *MalType, allocator: std.mem.Allocator) MalType {
         return switch (self.*) {
             inline MalType.string, MalType.vector, MalType.list, MalType.dict => |*s| s.clone(allocator) catch .nil,

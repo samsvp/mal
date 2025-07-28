@@ -24,29 +24,71 @@ pub const Env = struct {
     /// Creates a new root environment, with the default functions.
     pub fn init_root(allocator: std.mem.Allocator) !Env {
         var env = Env.init();
-        try env.mapping.put(allocator, "+", .{ .builtin = add });
-        try env.mapping.put(allocator, "-", .{ .builtin = sub });
-        try env.mapping.put(allocator, "*", .{ .builtin = mul });
-        try env.mapping.put(allocator, "/", .{ .builtin = div });
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "+"),
+            .{ .builtin = add },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "-"),
+            .{ .builtin = sub },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "*"),
+            .{ .builtin = mul },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "/"),
+            .{ .builtin = div },
+        );
         return env;
     }
 
     pub fn get(self: Env, key: []const u8) ?MalType {
-        return self.mapping.get(key);
+        return self.mapping.get(key) orelse {
+            if (self.parent) |parent| {
+                return parent.get(key);
+            }
+            return null;
+        };
     }
 
-    pub fn add_val(
-        self: *Env,
-        allocator: std.mem.Allocator,
-        key: []const u8,
-        value: MalType,
-    ) !void {
-        try self.mapping.put(allocator, key, value);
+    pub fn getPtr(self: Env, key: []const u8) ?*MalType {
+        return self.mapping.getPtr(key) orelse {
+            if (self.parent) |parent| {
+                return parent.getPtr(key);
+            }
+            return null;
+        };
+    }
+
+    pub fn set(self: *Env, allocator: std.mem.Allocator, key: []const u8, val: *MalType) MalType {
+        const key_owned = std.mem.Allocator.dupe(allocator, u8, key) catch {
+            return MalType.makeError(allocator, "Could not copy key, Out of Memory");
+        };
+        self.mapping.put(allocator, key_owned, val.clone(allocator)) catch {
+            return MalType.makeError(allocator, "Could not add to map Out of Memory");
+        };
+        return .nil;
     }
 
     pub fn deinit(self: *Env, allocator: std.mem.Allocator) void {
-        // !TODO!: deallocate variables
+        var iter = self.mapping.iterator();
+        while (iter.next()) |entry| {
+            allocator.free(entry.key_ptr.*);
+            entry.value_ptr.deinit(allocator) catch {};
+        }
         self.mapping.deinit(allocator);
+    }
+
+    pub fn deinit_all(self: *Env, allocator: std.mem.Allocator) void {
+        self.deinit(allocator);
+        if (self.parent) |parent| {
+            parent.deinit_all(allocator);
+        }
     }
 };
 
