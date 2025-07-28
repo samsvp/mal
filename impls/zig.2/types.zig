@@ -35,7 +35,6 @@ pub const MalType = union(enum) {
                     allocator.free(arg);
                 }
                 allocator.free(self.args);
-                self.env.deinit(allocator);
             }
         };
 
@@ -63,10 +62,12 @@ pub const MalType = union(enum) {
                 }
             }
 
+            // if the env has a parent, then clone the environment. This is done to avoid cyclic dependency.
+            const env = if (root.parent) |_| root.clone() else root;
             const m_fn = PageShared(Fn_).init(Fn_{
                 .ast = ast.clone(allocator),
                 .args = args_owned,
-                .env = root.clone(),
+                .env = env,
             }) catch {
                 deinitArgs(allocator, args_owned);
                 return makeError(allocator, "Failed to create function, out of memory");
@@ -74,6 +75,23 @@ pub const MalType = union(enum) {
 
             const self = Fn{ .shared_fn = m_fn };
             return .{ .function = self };
+        }
+
+        pub fn getAst(self: *Fn) *MalType {
+            return &self.shared_fn.getPtr().ast;
+        }
+
+        pub fn getArgs(self: Fn) [][]const u8 {
+            return self.shared_fn.get().args;
+        }
+
+        pub fn getEnv(self: *Fn) *Env {
+            return self.shared_fn.getPtr().env;
+        }
+
+        pub fn clone(self: *Fn, _: std.mem.Allocator) SharedError!MalType {
+            const shared = try self.shared_fn.clone();
+            return .{ .function = Fn{ .shared_fn = shared } };
         }
 
         pub fn deinit(self: *Fn, allocator: std.mem.Allocator) !void {
@@ -312,7 +330,12 @@ pub const MalType = union(enum) {
 
     pub fn clone(self: *MalType, allocator: std.mem.Allocator) MalType {
         return switch (self.*) {
-            inline MalType.string, MalType.vector, MalType.list, MalType.dict => |*s| s.clone(allocator) catch .nil,
+            inline MalType.string,
+            MalType.vector,
+            MalType.list,
+            MalType.dict,
+            MalType.function,
+            => |*s| s.clone(allocator) catch .nil,
             MalType.err => |*s| {
                 const str = s.clone(allocator) catch {
                     return .nil;

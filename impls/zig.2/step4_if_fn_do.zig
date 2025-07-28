@@ -195,6 +195,42 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
                     const ret = op(allocator, new_list.list.getItems()[1..]);
                     return ret;
                 },
+                .function => |*f| {
+                    defer new_list.deinit(allocator) catch {};
+
+                    const fn_args = f.getArgs();
+                    var ast = f.getAst().clone(allocator);
+                    defer ast.deinit(allocator) catch unreachable;
+
+                    if (fn_args.len == 0) {
+                        return eval(allocator, &ast, env);
+                    }
+
+                    const args = new_list.list.getItems()[1..];
+                    if (args.len == 0) {
+                        return fst.clone(allocator);
+                    }
+
+                    if (args.len != fn_args.len) {
+                        return MalType.makeErrorF(
+                            allocator,
+                            "Wrong number of arguments: expected {d}, got {d}",
+                            .{ fn_args.len, args.len },
+                        );
+                    }
+
+                    var fn_env = Env.init_with_parent(f.getEnv());
+                    defer fn_env.deinit(allocator);
+
+                    for (fn_args, args) |arg_name, *arg_value| {
+                        const ret = fn_env.set(allocator, arg_name, arg_value);
+                        switch (ret) {
+                            .err => return ret,
+                            else => {},
+                        }
+                    }
+                    return eval(allocator, &ast, &fn_env);
+                },
                 .err => {
                     defer new_list.deinit(allocator) catch unreachable;
                     return fst.clone(allocator);
