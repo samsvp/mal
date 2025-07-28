@@ -187,8 +187,14 @@ fn readAtom(
                 return .{ .float = float };
             }
 
-            if (atom.len == 3 and std.mem.eql(u8, atom, "nil")) {
+            if (std.mem.eql(u8, atom, "nil")) {
                 return .nil;
+            }
+
+            if (std.mem.eql(u8, atom, "true")) {
+                return .{ .boolean = true };
+            } else if (std.mem.eql(u8, atom, "false")) {
+                return .{ .boolean = false };
             }
 
             const str = MalType.String.initFrom(allocator, atom) catch return ParserError.OutOfMemory;

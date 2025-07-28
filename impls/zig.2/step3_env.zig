@@ -9,7 +9,23 @@ fn read(allocator: std.mem.Allocator, s: []const u8) !MalType {
     return try Reader.readStr(allocator, s);
 }
 
+fn print_eval(allocator: std.mem.Allocator, s: MalType) void {
+    const str = s.toString(allocator) catch unreachable;
+    defer allocator.free(str);
+
+    std.debug.print("EVAL: {s}\n", .{str});
+}
+
 fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
+    const is_eval = env.get("DEBUG-EVAL");
+    if (is_eval) |flag| {
+        switch (flag) {
+            .nil, .err => {},
+            .boolean => |f| if (f)
+                print_eval(allocator, s.*),
+            else => print_eval(allocator, s.*),
+        }
+    }
     return switch (s.*) {
         .symbol => |symbol| if (env.getPtr(symbol.getStr())) |value|
             value.clone(allocator)

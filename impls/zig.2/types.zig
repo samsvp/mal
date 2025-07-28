@@ -11,6 +11,7 @@ pub const MalType = union(enum) {
     nil,
     int: i32,
     float: f32,
+    boolean: bool,
     list: Array,
     vector: Array,
     err: String,
@@ -280,6 +281,10 @@ pub const MalType = union(enum) {
                 .int => |v2| v1 == v2,
                 else => false,
             },
+            .boolean => |v1| switch (b) {
+                .boolean => |v2| v1 == v2,
+                else => false,
+            },
             .float => |v1| switch (b) {
                 .float => |v2| v1 == v2,
                 else => false,
@@ -363,8 +368,6 @@ pub const MalType = union(enum) {
             .string => |s| try std.fmt.format(buffer.writer(), "\"{s}\"", .{s.getStr()}),
             .err => |s| try std.fmt.format(buffer.writer(), "ERROR: {s}", .{s.getStr()}),
             .nil => try buffer.appendSlice("nil"),
-            .int => |i| try std.fmt.format(buffer.writer(), "{}", .{i}),
-            .float => |f| try std.fmt.format(buffer.writer(), "{}", .{f}),
             .list => |l| {
                 try buffer.appendSlice("(");
                 for (l.getItems(), 0..) |item, i| {
@@ -393,6 +396,7 @@ pub const MalType = union(enum) {
             },
             .function => try buffer.appendSlice("#<function>"),
             .builtin => try buffer.appendSlice("#<function><builtin>"),
+            inline .int, .float, .boolean => |i| try std.fmt.format(buffer.writer(), "{}", .{i}),
         }
     }
 
