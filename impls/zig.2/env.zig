@@ -83,18 +83,43 @@ fn add(allocator: std.mem.Allocator, args: []MalType) MalType {
             for (args) |arg| {
                 switch (arg) {
                     .string => |s| {
-                        acc.addMut(allocator, s) catch {
-                            acc.deinit(allocator);
+                        acc.string.addMut(allocator, s) catch {
+                            acc.deinit(allocator) catch {};
                             return MalType.makeError(allocator, "Could not add strings, OOM");
                         };
                     },
                     else => {
-                        acc.deinit(allocator);
+                        acc.deinit(allocator) catch {};
                         return MalType.makeError(allocator, "Can only add string to other strings");
                     },
                 }
             }
-            return .{ .string = acc };
+            return acc;
+        },
+        .list, .vector => |*arr| {
+            var acc = arr.clone(allocator) catch {
+                return MalType.makeError(allocator, "Could not create new array");
+            };
+            for (args[1..]) |*arg| {
+                switch (arg.*) {
+                    .list, .vector => |*vs| {
+                        const ret = switch (acc) {
+                            .list => |*l| l.addMut(allocator, vs),
+                            .vector => |*v| v.addMut(allocator, vs),
+                            else => unreachable,
+                        };
+                        switch (ret) {
+                            .err => return ret,
+                            else => {},
+                        }
+                    },
+                    else => {
+                        acc.deinit(allocator) catch {};
+                        return MalType.makeError(allocator, "Can only add string to other strings");
+                    },
+                }
+            }
+            return acc;
         },
         else => return MalType.makeError(allocator, "Can not add type"),
     }
