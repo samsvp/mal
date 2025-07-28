@@ -6,18 +6,21 @@ const MalType = @import("types.zig").MalType;
 pub const Env = struct {
     mapping: std.StringHashMapUnmanaged(MalType),
     parent: ?*Env,
+    ref_count: usize,
 
     pub fn init() Env {
         return .{
             .mapping = .empty,
             .parent = null,
+            .ref_count = 1,
         };
     }
 
     pub fn init_with_parent(env: *Env) Env {
         return .{
             .mapping = .empty,
-            .parent = env,
+            .parent = env.clone(),
+            .ref_count = 1,
         };
     }
 
@@ -75,19 +78,35 @@ pub const Env = struct {
         return .nil;
     }
 
+    pub fn clone(self: *Env) *Env {
+        self.ref_count += 1;
+        var maybe_parent = self.parent;
+        while (maybe_parent) |parent| {
+            parent.ref_count += 1;
+            maybe_parent = parent.parent;
+        }
+        return self;
+    }
+
     pub fn deinit(self: *Env, allocator: std.mem.Allocator) void {
+        if (self.ref_count == 0) {
+            return;
+        }
+
+        self.ref_count -= 1;
+
+        if (self.ref_count > 0) {
+            return;
+        }
+
         var iter = self.mapping.iterator();
         while (iter.next()) |entry| {
             allocator.free(entry.key_ptr.*);
             entry.value_ptr.deinit(allocator) catch {};
         }
         self.mapping.deinit(allocator);
-    }
-
-    pub fn deinit_all(self: *Env, allocator: std.mem.Allocator) void {
-        self.deinit(allocator);
         if (self.parent) |parent| {
-            parent.deinit_all(allocator);
+            parent.deinit(allocator);
         }
     }
 };

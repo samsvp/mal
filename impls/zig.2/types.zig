@@ -1,4 +1,5 @@
 const std = @import("std");
+const Env = @import("env.zig").Env;
 const Shared = @import("shared.zig");
 const PageShared = Shared.PageShared;
 const SharedError = Shared.SharedErrors;
@@ -18,6 +19,67 @@ pub const MalType = union(enum) {
     dict: Dict,
     function: Fn,
     builtin: *const fn (allocator: std.mem.Allocator, args: []MalType) MalType,
+
+    /// A basic type to define user made functions
+    pub const Fn = struct {
+        shared_fn: PageShared(Fn_),
+
+        const Fn_ = struct {
+            ast: MalType,
+            args: [][]const u8,
+            env: *Env,
+
+            pub fn deinit(self: *Fn_, allocator: std.mem.Allocator) void {
+                self.ast.deinit(allocator) catch unreachable;
+                for (self.args) |arg| {
+                    allocator.free(arg);
+                }
+                allocator.free(self.args);
+                self.env.deinit(allocator);
+            }
+        };
+
+        pub fn init(allocator: std.mem.Allocator, ast: *MalType, args: []MalType, root: *Env) MalType {
+            var args_owned = allocator.alloc([]const u8, args.len) catch {
+                return makeError(allocator, "Failed to copy args, out of memory.");
+            };
+
+            const deinitArgs = struct {
+                pub fn f(allocator_: std.mem.Allocator, args_owned_: [][]const u8) void {
+                    for (args_owned_) |ao| {
+                        allocator_.free(ao);
+                    }
+                    allocator_.free(args_owned_);
+                }
+            }.f;
+
+            for (args, 0..) |arg, i| {
+                switch (arg) {
+                    .symbol => |s| args_owned[i] = allocator.dupe(u8, s.getStr()) catch unreachable,
+                    else => {
+                        deinitArgs(allocator, args_owned);
+                        return makeError(allocator, "Function arguments accept only symbols");
+                    },
+                }
+            }
+
+            const m_fn = PageShared(Fn_).init(Fn_{
+                .ast = ast.clone(allocator),
+                .args = args_owned,
+                .env = root.clone(),
+            }) catch {
+                deinitArgs(allocator, args_owned);
+                return makeError(allocator, "Failed to create function, out of memory");
+            };
+
+            const self = Fn{ .shared_fn = m_fn };
+            return .{ .function = self };
+        }
+
+        pub fn deinit(self: *Fn, allocator: std.mem.Allocator) !void {
+            try self.shared_fn.deinit(allocator);
+        }
+    };
 
     pub const Array = struct {
         items: PageShared(MArray),
@@ -160,12 +222,6 @@ pub const MalType = union(enum) {
         pub fn clone(self: *String, _: std.mem.Allocator) !MalType {
             return .{ .string = .{ .chars = try self.chars.clone() } };
         }
-    };
-
-    /// A basic type to define user made functions
-    pub const Fn = struct {
-        ast: *MalType,
-        args: [][]const u8,
     };
 
     pub const Dict = struct {
@@ -402,17 +458,16 @@ pub const MalType = union(enum) {
 
     pub fn deinit(self: *MalType, allocator: std.mem.Allocator) !void {
         switch (self.*) {
-            // It would actually be way better if all of the data of a list were stored sequentially, without the need
-            // of a for loop. I would need to rewrite the whole structure of the data though. This is something to keep in
-            // mind, though.
-            MalType.list, MalType.vector => |*list| {
-                try list.deinit(allocator);
-            },
-            MalType.dict => |*d| {
-                try d.deinit(allocator);
-            },
-            MalType.string, MalType.err, MalType.keyword, MalType.symbol => |*s| {
-                try s.deinit(allocator);
+            inline MalType.list,
+            MalType.vector,
+            MalType.dict,
+            MalType.string,
+            MalType.err,
+            MalType.keyword,
+            MalType.symbol,
+            MalType.function,
+            => |*f| {
+                try f.deinit(allocator);
             },
             else => return,
         }

@@ -151,6 +151,20 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
                             else => eval(allocator, &items[2], env),
                         };
                     }
+                    if (std.mem.eql(u8, s_chars, "fn*")) {
+                        const items = list.getItems();
+                        if (items.len != 3) {
+                            return MalType.makeError(allocator, "'fn*' takes only 2 parameters, function arguments and body.");
+                        }
+
+                        const args = switch (items[1]) {
+                            .vector, .list => |arr| arr.items.get().items,
+                            else => return MalType.makeError(allocator, "'fn*' arguments must be inside a list"),
+                        };
+
+                        const ast = &items[2];
+                        return MalType.Fn.init(allocator, ast, args, env);
+                    }
                 },
                 else => {},
             }
