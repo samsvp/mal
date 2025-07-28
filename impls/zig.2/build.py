@@ -9,6 +9,7 @@ commands = {
     1: "step1_read_print",
     2: "step2_eval",
     3: "step3_env",
+    4: "step4_if_fn_do",
 }
 
 def build(step: int):
