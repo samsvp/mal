@@ -158,7 +158,7 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
                         }
 
                         const args = switch (items[1]) {
-                            .vector, .list => |arr| arr.items.get().items,
+                            .vector, .list => |arr| arr.getItems(),
                             else => return MalType.makeError(allocator, "'fn*' arguments must be inside a list"),
                         };
 

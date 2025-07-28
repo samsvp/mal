@@ -100,7 +100,7 @@ pub const MalType = union(enum) {
     };
 
     pub const Array = struct {
-        items: PageShared(MArray),
+        array: PageShared(MArray),
         array_type: ArrayType,
 
         const ArrayType = enum {
@@ -108,48 +108,66 @@ pub const MalType = union(enum) {
             vector,
         };
 
-        const MArray = std.ArrayListUnmanaged(MalType);
+        const MArray = struct {
+            arr: *std.ArrayListUnmanaged(MalType),
 
-        fn initArr(allocator: std.mem.Allocator, arr: *MArray) !PageShared(MArray) {
-            var items: MArray = .empty;
+            pub fn deinit(self: *MArray, allocator: std.mem.Allocator) void {
+                for (self.arr.items) |*item| {
+                    item.deinit(allocator) catch unreachable;
+                }
+                self.arr.deinit(allocator);
+                allocator.destroy(self.arr);
+            }
+        };
+
+        fn initArr(allocator: std.mem.Allocator, arr: *std.ArrayListUnmanaged(MalType)) !PageShared(MArray) {
+            const items_ptr = try allocator.create(std.ArrayListUnmanaged(MalType));
+            var items: std.ArrayListUnmanaged(MalType) = .empty;
 
             for (arr.items) |*item| {
                 try items.append(allocator, item.clone(allocator));
             }
 
-            return try PageShared(MArray).init(items);
+            items_ptr.* = items;
+            return try PageShared(MArray).init(.{ .arr = items_ptr });
         }
 
-        pub fn initList(allocator: std.mem.Allocator, arr: *MArray) !MalType {
+        pub fn initList(allocator: std.mem.Allocator, arr: *std.ArrayListUnmanaged(MalType)) !MalType {
             const new_arr = try initArr(allocator, arr);
-            const list = Array{ .items = new_arr, .array_type = .list };
+            const list = Array{ .array = new_arr, .array_type = .list };
             return .{ .list = list };
         }
 
         pub fn emptyList(allocator: std.mem.Allocator) MalType {
-            const items: MArray = .empty;
-            const new_arr = PageShared(MArray).init(items) catch {
+            const items_ptr = allocator.create(std.ArrayListUnmanaged(MalType)) catch {
+                return makeError(allocator, "Could not create list, out of memory");
+            };
+            items_ptr.* = std.ArrayListUnmanaged(MalType).empty;
+            const new_arr = PageShared(MArray).init(.{ .arr = items_ptr }) catch {
                 return makeError(allocator, "Could not create list");
             };
-            return .{ .list = .{ .items = new_arr, .array_type = .list } };
+            return .{ .list = .{ .array = new_arr, .array_type = .list } };
         }
 
         pub fn emptyVector(allocator: std.mem.Allocator) MalType {
-            const items: MArray = .empty;
-            const new_arr = PageShared(MArray).init(items) catch {
+            const items_ptr = allocator.create(std.ArrayListUnmanaged(MalType)) catch {
+                return makeError(allocator, "Could not create vector, out of memory");
+            };
+            items_ptr.* = std.ArrayListUnmanaged(MalType).empty;
+            const new_arr = PageShared(MArray).init(.{ .arr = items_ptr }) catch {
                 return makeError(allocator, "Could not create list");
             };
-            return .{ .vector = .{ .items = new_arr, .array_type = .vector } };
+            return .{ .vector = .{ .array = new_arr, .array_type = .vector } };
         }
 
-        pub fn initVector(allocator: std.mem.Allocator, arr: *MArray) !MalType {
+        pub fn initVector(allocator: std.mem.Allocator, arr: *std.ArrayListUnmanaged(MalType)) !MalType {
             const new_arr = try initArr(allocator, arr);
-            const vector = Array{ .items = new_arr, .array_type = .vector };
+            const vector = Array{ .array = new_arr, .array_type = .vector };
             return .{ .vector = vector };
         }
 
         pub fn append(self: *Array, allocator: std.mem.Allocator, value: MalType) MalType {
-            self.items.getPtr().append(allocator, value) catch {
+            self.array.getPtr().arr.append(allocator, value) catch {
                 return makeError(allocator, "Could not append to collection, OOM");
             };
             return .nil;
@@ -172,35 +190,33 @@ pub const MalType = union(enum) {
         }
 
         pub fn addMut(self: *Array, allocator: std.mem.Allocator, other: *Array) MalType {
-            self.items.getPtr().ensureUnusedCapacity(allocator, other.getItems().len) catch {
+            var arr = self.array.getPtr().arr;
+            arr.ensureUnusedCapacity(allocator, other.getItems().len) catch {
                 return makeError(allocator, "Can not add arrays, Out of Memory");
             };
             for (other.getItems()) |*item| {
-                self.items.getPtr().appendAssumeCapacity(item.clone(allocator));
+                arr.appendAssumeCapacity(item.clone(allocator));
             }
             return .nil;
         }
 
         pub fn getItems(self: Array) []MalType {
-            return self.items.get().items;
+            return self.array.get().arr.items;
         }
 
         pub fn getItemsPtr(self: Array) *[]MalType {
-            return self.items.getPtr().items;
+            return self.array.getPtr().arr.items;
         }
 
-        pub fn clone(self: *Array, allocator: std.mem.Allocator) !MalType {
+        pub fn clone(self: *Array, _: std.mem.Allocator) !MalType {
             return switch (self.array_type) {
-                .list => initList(allocator, self.items.getPtr()),
-                .vector => initVector(allocator, self.items.getPtr()),
+                .list => .{ .list = .{ .array = try self.array.clone(), .array_type = .list } },
+                .vector => .{ .vector = .{ .array = try self.array.clone(), .array_type = .vector } },
             };
         }
 
         pub fn deinit(self: *Array, allocator: std.mem.Allocator) SharedError!void {
-            for (self.items.getPtr().items) |*item| {
-                try item.deinit(allocator);
-            }
-            try self.items.deinit(allocator);
+            try self.array.deinit(allocator);
         }
     };
 
