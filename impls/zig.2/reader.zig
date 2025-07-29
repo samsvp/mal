@@ -252,21 +252,26 @@ fn readDict(allocator: std.mem.Allocator, reader: *Reader) ParserError!MalType {
     while (reader.peek()) |token| {
         if (std.mem.eql(u8, token, "}")) {
             _ = reader.next();
-            if (maybe_key) |_| {
+            if (maybe_key) |*key| {
+                key.deinit(allocator) catch unreachable;
                 return ParserError.EOFCollectionReadError;
             }
             return dict;
         }
         var val = try readForm(allocator, reader);
         if (maybe_key) |*key| {
-            defer key.deinit(allocator) catch unreachable;
-            defer val.deinit(allocator) catch unreachable;
-
             var ret = dict.dict.add(allocator, key, &val);
             defer ret.deinit(allocator) catch unreachable;
+
+            defer val.deinit(allocator) catch unreachable;
             switch (ret) {
-                .err => return ParserError.UnhashableKey,
-                else => {},
+                .err => {
+                    key.deinit(allocator) catch unreachable;
+                    return ParserError.UnhashableKey;
+                },
+                else => {
+                    key.deinit(allocator) catch unreachable;
+                },
             }
             maybe_key = null;
         } else maybe_key = val;
