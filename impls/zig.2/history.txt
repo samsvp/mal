@@ -1,14 +1,3 @@
-(let* (a 3 DEBUG-EVAL true) a)
-(let* (a 3 DEBUG-EVAL false) a)
-(do (+ 1 2 3))
-(do (+ 1 2 3) (1 2))
-(do)
-(do (+ 1 2 3) (1 2))
-(do (+ 1 2 3) (1 2) ["hello"])
-(do (+ 1 2 3) (1 2) ["hello"] (def! a 5))
-a
-(do (+ 1 2 3) (1 2) ["hello"] (def! a 5))
-a
 (if (true) a)
 (if (= (+1 2 3) 6) a)
 (if (nil) a (+ 1 2 3))
@@ -97,3 +86,14 @@ a
 {a 1 "b" 5 "c" 10}
 (def! a "hello")
 {a 1 "b" 5 "c" 10}
+(1 2 3)
+(1 2 3 4 5)
+(+ (1 2 3 4 5) (6 7))
+(list)
+(list 1 2)
+(list? 1 2)
+(list? ())
+(list? 1)
+(list? [])
+(empty? [])
+(empty? [1 2])

@@ -229,8 +229,8 @@ fn readCollection(
         if (std.mem.eql(u8, token, close_bracket)) {
             _ = reader.next();
             return switch (collection_type) {
-                .list => MalType.Array.initList(allocator, &list) catch ParserError.OutOfMemory,
-                .vector => MalType.Array.initVector(allocator, &list) catch ParserError.OutOfMemory,
+                .list => MalType.Array.initList(allocator, list.items) catch ParserError.OutOfMemory,
+                .vector => MalType.Array.initVector(allocator, list.items) catch ParserError.OutOfMemory,
             };
         }
         const val = try readForm(allocator, reader);

@@ -120,19 +120,19 @@ pub const MalType = union(enum) {
             }
         };
 
-        fn initArr(allocator: std.mem.Allocator, arr: *std.ArrayListUnmanaged(MalType)) !PageShared(MArray) {
+        fn initArr(allocator: std.mem.Allocator, arr: []MalType) !PageShared(MArray) {
             const items_ptr = try allocator.create(std.ArrayListUnmanaged(MalType));
-            var items: std.ArrayListUnmanaged(MalType) = .empty;
+            var items: std.ArrayListUnmanaged(MalType) = try .initCapacity(allocator, arr.len);
 
-            for (arr.items) |*item| {
-                try items.append(allocator, item.clone(allocator));
+            for (arr) |*item| {
+                items.appendAssumeCapacity(item.clone(allocator));
             }
 
             items_ptr.* = items;
             return try PageShared(MArray).init(.{ .arr = items_ptr });
         }
 
-        pub fn initList(allocator: std.mem.Allocator, arr: *std.ArrayListUnmanaged(MalType)) !MalType {
+        pub fn initList(allocator: std.mem.Allocator, arr: []MalType) !MalType {
             const new_arr = try initArr(allocator, arr);
             const list = Array{ .array = new_arr, .array_type = .list };
             return .{ .list = list };
@@ -149,6 +149,12 @@ pub const MalType = union(enum) {
             return .{ .list = .{ .array = new_arr, .array_type = .list } };
         }
 
+        pub fn initVector(allocator: std.mem.Allocator, arr: []MalType) !MalType {
+            const new_arr = try initArr(allocator, arr);
+            const vector = Array{ .array = new_arr, .array_type = .vector };
+            return .{ .vector = vector };
+        }
+
         pub fn emptyVector(allocator: std.mem.Allocator) MalType {
             const items_ptr = allocator.create(std.ArrayListUnmanaged(MalType)) catch {
                 return makeError(allocator, "Could not create vector, out of memory");
@@ -158,12 +164,6 @@ pub const MalType = union(enum) {
                 return makeError(allocator, "Could not create list");
             };
             return .{ .vector = .{ .array = new_arr, .array_type = .vector } };
-        }
-
-        pub fn initVector(allocator: std.mem.Allocator, arr: *std.ArrayListUnmanaged(MalType)) !MalType {
-            const new_arr = try initArr(allocator, arr);
-            const vector = Array{ .array = new_arr, .array_type = .vector };
-            return .{ .vector = vector };
         }
 
         pub fn append(self: *Array, allocator: std.mem.Allocator, value: MalType) MalType {
