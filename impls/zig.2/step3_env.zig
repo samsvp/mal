@@ -164,16 +164,19 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
             return new_v;
         },
         .dict => |dict| {
-            var new_dict = MalType.Dict.init() catch {
+            var new_dict = MalType.Dict.init(allocator) catch {
                 return MalType.makeError(allocator, "Could not create new dict, Out of Memory");
             };
 
             var iter = dict.getValues().iterator();
             while (iter.next()) |entry| {
-                var value = eval(allocator, entry.value_ptr, env);
-                defer value.deinit(allocator) catch {};
+                var key_value = eval(allocator, entry.key_ptr, env);
+                defer key_value.deinit(allocator) catch unreachable;
 
-                const ret = new_dict.dict.add(allocator, entry.key_ptr, &value);
+                var value = eval(allocator, entry.value_ptr, env);
+                defer value.deinit(allocator) catch unreachable;
+
+                const ret = new_dict.dict.add(allocator, &key_value, &value);
                 switch (ret) {
                     .err => {
                         new_dict.deinit(allocator) catch {};

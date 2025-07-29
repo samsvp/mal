@@ -259,7 +259,7 @@ pub const MalType = union(enum) {
     };
 
     pub const Dict = struct {
-        values: PageShared(Map),
+        dict: PageShared(MDict),
 
         const Map = std.HashMapUnmanaged(
             MalType,
@@ -268,10 +268,24 @@ pub const MalType = union(enum) {
             std.hash_map.default_max_load_percentage,
         );
 
+        const MDict = struct {
+            map: *Map,
+
+            pub fn deinit(self: *MDict, allocator: std.mem.Allocator) void {
+                var iter = self.map.iterator();
+                while (iter.next()) |entry| {
+                    entry.key_ptr.deinit(allocator) catch unreachable;
+                    entry.value_ptr.deinit(allocator) catch unreachable;
+                }
+                self.map.deinit(allocator);
+                allocator.destroy(self.map);
+            }
+        };
+
         pub fn add(self: *Dict, allocator: std.mem.Allocator, key: *MalType, value: *MalType) MalType {
             switch (key.*) {
-                .int, .string, .keyword => {
-                    self.values.getPtr().put(allocator, key.clone(allocator), value.clone(allocator)) catch {
+                .int, .string, .keyword, .symbol => {
+                    self.dict.getPtr().map.put(allocator, key.clone(allocator), value.clone(allocator)) catch {
                         return makeError(allocator, "Allocator error: Could not add value to hash map");
                     };
                     return .nil;
@@ -280,31 +294,23 @@ pub const MalType = union(enum) {
             }
         }
 
-        pub fn init() !MalType {
+        pub fn init(allocator: std.mem.Allocator) !MalType {
+            const map_ptr = try allocator.create(Map);
             const values: Map = .empty;
-            return .{ .dict = .{ .values = try PageShared(Map).init(values) } };
+            map_ptr.* = values;
+            return .{ .dict = .{ .dict = try PageShared(MDict).init(.{ .map = map_ptr }) } };
         }
 
         pub fn deinit(self: *Dict, allocator: std.mem.Allocator) SharedError!void {
-            var iter = self.getValues().iterator();
-            while (iter.next()) |entry| {
-                try entry.key_ptr.deinit(allocator);
-                try entry.value_ptr.deinit(allocator);
-            }
-            try self.values.deinit(allocator);
+            try self.dict.deinit(allocator);
         }
 
         pub fn getValues(self: Dict) Map {
-            return self.values.get();
+            return self.dict.get().map.*;
         }
 
-        pub fn clone(self: *Dict, allocator: std.mem.Allocator) !MalType {
-            var dict = try init();
-            var iter = self.getValues().iterator();
-            while (iter.next()) |entry| {
-                _ = dict.dict.add(allocator, entry.key_ptr, entry.value_ptr);
-            }
-            return dict;
+        pub fn clone(self: *Dict, _: std.mem.Allocator) !MalType {
+            return .{ .dict = .{ .dict = try self.dict.clone() } };
         }
 
         const Context = struct {
@@ -482,7 +488,14 @@ pub const MalType = union(enum) {
             .dict => |d| {
                 try buffer.appendSlice("{");
                 var iter = d.getValues().iterator();
+                var first: bool = true;
                 while (iter.next()) |entry| {
+                    if (!first) {
+                        try buffer.append(' ');
+                    } else {
+                        first = false;
+                    }
+
                     try entry.key_ptr.toStringInternal(buffer);
                     try buffer.appendSlice(" ");
                     try entry.value_ptr.toStringInternal(buffer);

@@ -242,7 +242,7 @@ fn readCollection(
 }
 
 fn readDict(allocator: std.mem.Allocator, reader: *Reader) ParserError!MalType {
-    var dict = MalType.Dict.init() catch {
+    var dict = MalType.Dict.init(allocator) catch {
         return ParserError.OutOfMemory;
     };
     errdefer dict.deinit(allocator) catch {};
@@ -259,12 +259,14 @@ fn readDict(allocator: std.mem.Allocator, reader: *Reader) ParserError!MalType {
         }
         var val = try readForm(allocator, reader);
         if (maybe_key) |*key| {
-            switch (dict.dict.add(allocator, key, &val)) {
+            defer key.deinit(allocator) catch unreachable;
+            defer val.deinit(allocator) catch unreachable;
+
+            var ret = dict.dict.add(allocator, key, &val);
+            defer ret.deinit(allocator) catch unreachable;
+            switch (ret) {
                 .err => return ParserError.UnhashableKey,
-                else => {
-                    key.deinit(allocator) catch unreachable;
-                    val.deinit(allocator) catch unreachable;
-                },
+                else => {},
             }
             maybe_key = null;
         } else maybe_key = val;
