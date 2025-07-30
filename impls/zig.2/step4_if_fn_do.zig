@@ -44,7 +44,7 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
                         if (items.len != 3) {
                             return MalType.makeError(allocator, "'let*' takes two parametes");
                         }
-                        var new_env = Env.init_with_parent(env);
+                        var new_env = Env.initWithParent(allocator, env);
                         defer new_env.deinit(allocator);
 
                         const arr = switch (items[1]) {
@@ -61,12 +61,12 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
                         for (0..args_items.len / 2) |_i| {
                             const i = 2 * _i;
 
-                            var arg_env = Env.init_with_parent(&new_env);
+                            var arg_env = Env.initWithParent(allocator, new_env);
                             defer arg_env.deinit(allocator);
 
                             const key = args_items[i];
 
-                            var value = eval(allocator, &args_items[i + 1], &arg_env);
+                            var value = eval(allocator, &args_items[i + 1], arg_env);
                             defer value.deinit(allocator) catch {};
 
                             switch (key) {
@@ -85,7 +85,7 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
                             }
                         }
 
-                        return eval(allocator, &items[2], &new_env);
+                        return eval(allocator, &items[2], new_env);
                     }
                     if (std.mem.eql(u8, s_chars, "def!")) {
                         const items = list.getItems();
@@ -203,7 +203,7 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
                     defer ast.deinit(allocator) catch unreachable;
 
                     if (fn_args.len == 0) {
-                        return eval(allocator, &ast, env);
+                        return eval(allocator, &ast, f.getEnv());
                     }
 
                     const args = new_list.list.getItems()[1..];
@@ -219,7 +219,7 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
                         );
                     }
 
-                    var fn_env = Env.init_with_parent(f.getEnv());
+                    var fn_env = Env.initWithParent(allocator, f.getEnv());
                     defer fn_env.deinit(allocator);
 
                     for (fn_args, args) |arg_name, *arg_value| {
@@ -229,7 +229,7 @@ fn eval(allocator: std.mem.Allocator, s: *MalType, env: *Env) MalType {
                             else => {},
                         }
                     }
-                    return eval(allocator, &ast, &fn_env);
+                    return eval(allocator, &ast, fn_env);
                 },
                 .err => {
                     defer new_list.deinit(allocator) catch unreachable;
@@ -319,8 +319,8 @@ pub fn main() !void {
         if (deinit_status == .leak) std.debug.print("WARNING: memory leaked\n", .{});
     }
 
-    var env = try Env.init_root(allocator);
-    defer env.deinit_force(allocator);
+    var env = try Env.initRoot(allocator);
+    defer env.deinitForce(allocator);
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();
@@ -332,7 +332,7 @@ pub fn main() !void {
 
     while (try ln.linenoise("user> ")) |input| {
         defer allocator.free(input);
-        const res = rep(allocator, input, &env) catch |err| {
+        const res = rep(allocator, input, env) catch |err| {
             try stdout.print("{any}\n", .{err});
             continue;
         };

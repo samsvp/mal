@@ -9,25 +9,29 @@ pub const Env = struct {
     parent: ?*Env,
     ref_count: usize,
 
-    pub fn init() Env {
-        return .{
+    pub fn init(allocator: std.mem.Allocator) *Env {
+        const env = allocator.create(Env) catch unreachable;
+        env.* = .{
             .mapping = .empty,
             .parent = null,
             .ref_count = 1,
         };
+        return env;
     }
 
-    pub fn init_with_parent(env: *Env) Env {
-        return .{
+    pub fn initWithParent(allocator: std.mem.Allocator, parent: *Env) *Env {
+        const env = allocator.create(Env) catch unreachable;
+        env.* = .{
             .mapping = .empty,
-            .parent = env.clone(),
+            .parent = parent.clone(),
             .ref_count = 1,
         };
+        return env;
     }
 
     /// Creates a new root environment, with the default functions.
-    pub fn init_root(allocator: std.mem.Allocator) !Env {
-        var env = Env.init();
+    pub fn initRoot(allocator: std.mem.Allocator) !*Env {
+        var env = Env.init(allocator);
         try env.mapping.put(
             allocator,
             try std.mem.Allocator.dupe(allocator, u8, "="),
@@ -140,6 +144,7 @@ pub const Env = struct {
     }
 
     pub fn deinit(self: *Env, allocator: std.mem.Allocator) void {
+        std.debug.print("deinit ref count {}\n", .{self.ref_count});
         if (self.ref_count == 0) {
             return;
         }
@@ -159,9 +164,10 @@ pub const Env = struct {
         if (self.parent) |parent| {
             parent.deinit(allocator);
         }
+        allocator.destroy(self);
     }
 
-    pub fn deinit_force(self: *Env, allocator: std.mem.Allocator) void {
+    pub fn deinitForce(self: *Env, allocator: std.mem.Allocator) void {
         self.ref_count = 1;
         self.deinit(allocator);
     }
