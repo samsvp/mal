@@ -2,19 +2,82 @@ const std = @import("std");
 const MalType = @import("types.zig").MalType;
 
 pub fn eql(allocator: std.mem.Allocator, args: []MalType) MalType {
-    if (args.len != 2) {
-        return MalType.makeError(allocator, "accepts two parameters.");
+    if (args.len < 2) {
+        return MalType.makeError(allocator, "accepts at least two parameters.");
     }
 
-    return .{ .boolean = args[0].eql(args[1]) };
+    return for (args[1..]) |a| {
+        if (!args[0].eql(a)) break .{ .boolean = false };
+    } else blk: {
+        break :blk .{ .boolean = true };
+    };
 }
 
 pub fn notEql(allocator: std.mem.Allocator, args: []MalType) MalType {
-    if (args.len != 2) {
-        return MalType.makeError(allocator, "accepts two parameters.");
+    const ret = eql(allocator, args);
+    return switch (ret) {
+        .boolean => |b| .{ .boolean = !b },
+        else => ret,
+    };
+}
+
+pub fn cmp(allocator: std.mem.Allocator, args: []MalType, cmpFn: fn (f32, f32) bool) MalType {
+    if (args.len < 2) {
+        return MalType.makeError(allocator, "accepts at least two parameters.");
     }
 
-    return .{ .boolean = !args[0].eql(args[1]) };
+    const v1: f32 = switch (args[0]) {
+        .int => |i| @floatFromInt(i),
+        .float => |f| f,
+        else => return MalType.makeError(allocator, "Can only compare numeric types"),
+    };
+
+    return for (args[1..]) |a| {
+        const v2: f32 = switch (a) {
+            .int => |i| @floatFromInt(i),
+            .float => |f| f,
+            else => break MalType.makeError(allocator, "Can only compare numeric types"),
+        };
+        if (!cmpFn(v1, v2)) break .{ .boolean = false };
+    } else blk: {
+        break :blk .{ .boolean = true };
+    };
+}
+
+pub fn less(allocator: std.mem.Allocator, args: []MalType) MalType {
+    const lessFn = struct {
+        pub fn f(v1: f32, v2: f32) bool {
+            return v1 < v2;
+        }
+    }.f;
+    return cmp(allocator, args, lessFn);
+}
+
+pub fn lessEql(allocator: std.mem.Allocator, args: []MalType) MalType {
+    const lessFn = struct {
+        pub fn f(v1: f32, v2: f32) bool {
+            return v1 <= v2;
+        }
+    }.f;
+    return cmp(allocator, args, lessFn);
+}
+
+pub fn bigger(allocator: std.mem.Allocator, args: []MalType) MalType {
+    const lessFn = struct {
+        pub fn f(v1: f32, v2: f32) bool {
+            return v1 > v2;
+        }
+    }.f;
+    return cmp(allocator, args, lessFn);
+}
+
+pub fn biggerEql(allocator: std.mem.Allocator, args: []MalType) MalType {
+    const lessFn = struct {
+        pub fn f(v1: f32, v2: f32) bool {
+            return v1 >= v2;
+        }
+    }.f;
+    return cmp(allocator, args, lessFn);
 }
 
 pub fn add(allocator: std.mem.Allocator, args: []MalType) MalType {

@@ -40,6 +40,26 @@ pub const Env = struct {
         );
         try env.mapping.put(
             allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "<"),
+            .{ .builtin = core.less },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "<="),
+            .{ .builtin = core.lessEql },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, ">"),
+            .{ .builtin = core.bigger },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, ">="),
+            .{ .builtin = core.biggerEql },
+        );
+        try env.mapping.put(
+            allocator,
             try std.mem.Allocator.dupe(allocator, u8, "+"),
             .{ .builtin = core.add },
         );
