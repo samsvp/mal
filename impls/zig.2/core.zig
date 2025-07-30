@@ -255,6 +255,6 @@ pub fn count(allocator: std.mem.Allocator, args: []MalType) MalType {
     return switch (args[0]) {
         .list, .vector => |arr| .{ .int = @intCast(arr.getItems().len) },
         .dict => |d| .{ .int = @intCast(d.getValues().size) },
-        else => MalType.makeError(allocator, "Parameter must be list, array or dictionary."),
+        else => .{ .int = 0 },
     };
 }

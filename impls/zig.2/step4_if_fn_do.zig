@@ -320,7 +320,7 @@ pub fn main() !void {
     }
 
     var env = try Env.init_root(allocator);
-    defer env.deinit(allocator);
+    defer env.deinit_force(allocator);
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();

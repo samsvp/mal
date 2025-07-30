@@ -140,4 +140,9 @@ pub const Env = struct {
             parent.deinit(allocator);
         }
     }
+
+    pub fn deinit_force(self: *Env, allocator: std.mem.Allocator) void {
+        self.ref_count = 1;
+        self.deinit(allocator);
+    }
 };
