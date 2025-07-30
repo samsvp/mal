@@ -30,7 +30,6 @@ pub const MalType = union(enum) {
             env: *Env,
 
             pub fn deinit(self: *Fn_, allocator: std.mem.Allocator) void {
-                std.debug.print("bye\n", .{});
                 self.ast.deinit(allocator) catch unreachable;
                 for (self.args) |arg| {
                     allocator.free(arg);
@@ -96,7 +95,6 @@ pub const MalType = union(enum) {
         }
 
         pub fn deinit(self: *Fn, allocator: std.mem.Allocator) !void {
-            std.debug.print("wow\n", .{});
             try self.shared_fn.deinit(allocator);
         }
     };

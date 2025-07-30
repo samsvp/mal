@@ -102,6 +102,11 @@ pub const Env = struct {
             try std.mem.Allocator.dupe(allocator, u8, "count"),
             .{ .builtin = core.count },
         );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "prn"),
+            .{ .builtin = core.prn },
+        );
         return env;
     }
 
@@ -144,7 +149,6 @@ pub const Env = struct {
     }
 
     pub fn deinit(self: *Env, allocator: std.mem.Allocator) void {
-        std.debug.print("deinit ref count {}\n", .{self.ref_count});
         if (self.ref_count == 0) {
             return;
         }

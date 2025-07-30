@@ -1,4 +1,5 @@
 const std = @import("std");
+const printer = @import("printer.zig");
 const MalType = @import("types.zig").MalType;
 
 pub fn eql(allocator: std.mem.Allocator, args: []MalType) MalType {
@@ -320,4 +321,13 @@ pub fn count(allocator: std.mem.Allocator, args: []MalType) MalType {
         .dict => |d| .{ .int = @intCast(d.getValues().size) },
         else => .{ .int = 0 },
     };
+}
+
+pub fn prn(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len != 1) {
+        return MalType.makeError(allocator, "Only accepts one argument");
+    }
+
+    printer.prStr(allocator, args[0], true);
+    return .nil;
 }
