@@ -10,6 +10,7 @@ commands = {
     2: "step2_eval",
     3: "step3_env",
     4: "step4_if_fn_do",
+    5: "step5_tco",
 }
 
 def build(step: int):
