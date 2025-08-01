@@ -15,7 +15,7 @@ commands = {
 
 def build(step: int):
     command = commands[step]
-    subprocess.run(["zig", "build", f"-Dname={command}", f"-Droot_source_file={command}.zig"])
+    subprocess.run(["zig", "build", "-Doptimize=ReleaseFast", f"-Dname={command}", f"-Droot_source_file={command}.zig"])
 
 def run(step: int):
     current_env = os.environ.copy()
