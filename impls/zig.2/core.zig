@@ -1,4 +1,5 @@
 const std = @import("std");
+const reader = @import("reader.zig");
 const printer = @import("printer.zig");
 const MalType = @import("types.zig").MalType;
 
@@ -330,4 +331,47 @@ pub fn prn(allocator: std.mem.Allocator, args: []MalType) MalType {
 
     printer.prStr(allocator, args[0], true);
     return .nil;
+}
+
+pub fn readString(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len != 1) {
+        return MalType.makeError(allocator, "Only accepts one argument");
+    }
+
+    return switch (args[0]) {
+        .string => |s| reader.readStr(allocator, s.getStr()) catch |err|
+            MalType.makeErrorF(allocator, "Error reading string: {any}", .{err}),
+        else => MalType.makeError(allocator, "Argument must be string."),
+    };
+}
+
+pub fn slurp(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len != 1) {
+        return MalType.makeError(allocator, "Only accepts one argument");
+    }
+
+    const path = switch (args[0]) {
+        .string => |s| s.getStr(),
+        else => return MalType.makeError(allocator, "Argument must be string."),
+    };
+
+    var file = std.fs.cwd().openFile(path, .{}) catch |err| {
+        return MalType.makeErrorF(allocator, "Could not read file: {any}.", .{err});
+    };
+    defer file.close();
+
+    const file_size = file.getEndPos() catch |err| {
+        return MalType.makeErrorF(allocator, "Erro reading file: {any}.", .{err});
+    };
+    const buffer = allocator.alloc(u8, file_size) catch unreachable;
+    defer allocator.free(buffer);
+
+    _ = file.readAll(buffer) catch |err| {
+        return MalType.makeErrorF(allocator, "Erro reading file: {any}.", .{err});
+    };
+    return MalType.String.initFrom(allocator, buffer) catch |err| MalType.makeErrorF(
+        allocator,
+        "Could not convert file to string: {any}",
+        .{err},
+    );
 }

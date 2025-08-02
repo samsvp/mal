@@ -107,6 +107,16 @@ pub const Env = struct {
             try std.mem.Allocator.dupe(allocator, u8, "prn"),
             .{ .builtin = core.prn },
         );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "read-string"),
+            .{ .builtin = core.readString },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "slurp"),
+            .{ .builtin = core.slurp },
+        );
         return env;
     }
 
@@ -126,6 +136,14 @@ pub const Env = struct {
             }
             return null;
         };
+    }
+
+    pub fn getRoot(self: *Env) *Env {
+        var root = self;
+        while (root.parent) |p| {
+            root = p;
+        }
+        return root;
     }
 
     pub fn set(self: *Env, allocator: std.mem.Allocator, key: []const u8, val: *MalType) MalType {

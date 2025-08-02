@@ -1,0 +1,26 @@
+(slurp "core.zig")
+(read-string "123") 
+(read-string "(1") 
+(read-string "(1 2 3)") 
+(def! mal-prog (list + 1 2))
+(eval mal-prog)
+mal-prog
+(eval (+ 1 2 3))
+(let* (b 12) (do (eval (read-string "(def! aa 7)")) aa ))
+aa
+read-string "(def! aa 7)"
+(read-string "(def! aa 7)")
+(eval (read-string "(def! aa 7)"))
+aa
+(eval (read-string "(def! aa 7)"))
+aa
+(eval (read-string "(def! aa 7)"))
+(read-string "(def! aa 7)")
+(eval (def! aa 7))
+(read-string "(def! aa 7)")
+(eval (read-string "(def! aa 7)"))
+aa
+(let* (b 12) (do (eval (read-string "(def! aa 7)")) aa ))
+(def! aa 1)
+(read-string "(def! aa 7)")
+(eval (read-string "(def! aa 7)"))
