@@ -27,7 +27,8 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
         }
     }
 
-    var env = og_env;
+    var env = og_env.clone();
+    defer env.deinit(allocator);
     var s = og_s;
 
     while (true) {
@@ -90,6 +91,7 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                             }
 
                             s = &items[2];
+                            env.deinit(allocator);
                             env = new_env;
                             continue;
                             //return eval(allocator, &items[2], new_env);
@@ -216,6 +218,7 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
 
                         if (fn_args.len == 0) {
                             s = ast;
+                            env.deinit(allocator);
                             env = f.getEnv();
                             continue;
                             //return eval(allocator, &ast, f.getEnv());
@@ -245,6 +248,7 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                             }
                         }
                         s = ast;
+                        env.deinit(allocator);
                         env = fn_env;
                         continue;
                         //return eval(allocator, &ast, fn_env);

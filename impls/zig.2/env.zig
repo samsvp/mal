@@ -159,6 +159,10 @@ pub const Env = struct {
             return;
         }
 
+        self.deinitForce(allocator);
+    }
+
+    pub fn deinitForce(self: *Env, allocator: std.mem.Allocator) void {
         var iter = self.mapping.iterator();
         while (iter.next()) |entry| {
             allocator.free(entry.key_ptr.*);
@@ -169,10 +173,5 @@ pub const Env = struct {
             parent.deinit(allocator);
         }
         allocator.destroy(self);
-    }
-
-    pub fn deinitForce(self: *Env, allocator: std.mem.Allocator) void {
-        self.ref_count = 1;
-        self.deinit(allocator);
     }
 };
