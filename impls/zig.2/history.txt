@@ -3,3 +3,6 @@
 (1 2 3)
 ("hwllo" 1 2 3)
 ( ( (fn* (a) (fn* (b) (+ a b))) 5) 7)
+(if true 1 2)
+(if "hello" 1 2)
+(do "hello" "world")

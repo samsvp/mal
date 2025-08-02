@@ -159,7 +159,9 @@ pub const Env = struct {
             return;
         }
 
-        self.deinitForce(allocator);
+        if (self.parent) |_| {
+            self.deinitForce(allocator);
+        }
     }
 
     pub fn deinitForce(self: *Env, allocator: std.mem.Allocator) void {
