@@ -27,13 +27,14 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
         }
     }
 
-    var env = og_env;
+    var env = og_env.clone();
     defer env.deinit(allocator);
 
-    var s = og_s;
+    var s = og_s.clone(allocator);
+    defer s.deinit(allocator) catch unreachable;
 
     while (true) {
-        return switch (s.*) {
+        return switch (s) {
             .symbol => |symbol| if (env.getPtr(symbol.getStr())) |value|
                 value.clone(allocator)
             else
@@ -91,11 +92,11 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                                 }
                             }
 
-                            s = &items[2];
+                            s.deinit(allocator) catch unreachable;
+                            s = items[2].clone(allocator);
                             env.deinit(allocator);
                             env = new_env;
                             continue;
-                            //return eval(allocator, &items[2], new_env);
                         }
                         if (std.mem.eql(u8, s_chars, "def!")) {
                             const items = list.getItems();
@@ -138,7 +139,7 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                                     else => res = res_eval.clone(allocator),
                                 }
                             }
-                            s = &items[items.len - 1];
+                            s = items[items.len - 1].clone(allocator);
                             continue;
                         }
                         if (std.mem.eql(u8, s_chars, "if")) {
@@ -152,17 +153,23 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                             switch (cond) {
                                 .err => return cond.clone(allocator),
                                 .nil => if (items.len == 3) return .nil else {
-                                    s = &items[3];
+                                    s.deinit(allocator) catch unreachable;
+                                    s = items[3].clone(allocator);
                                 },
                                 .boolean => |b| if (b) {
-                                    s = &items[2];
+                                    s.deinit(allocator) catch unreachable;
+                                    s = items[2].clone(allocator);
                                 } else if (items.len == 3)
                                     return .nil
                                 else {
-                                    s = &items[3];
+                                    s.deinit(allocator) catch unreachable;
+                                    s = items[3].clone(allocator);
                                 },
 
-                                else => s = &items[2],
+                                else => {
+                                    s.deinit(allocator) catch unreachable;
+                                    s = items[2].clone(allocator);
+                                },
                             }
                             continue;
                         }
@@ -211,18 +218,18 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                         return ret;
                     },
                     .function => |*f| {
-                        //defer new_list.deinit(allocator) catch {};
+                        defer new_list.deinit(allocator) catch {};
 
                         const fn_args = f.getArgs();
-                        const ast = f.getAst();
-                        //defer ast.deinit(allocator) catch unreachable;
+                        var ast = f.getAst().clone(allocator);
+                        defer ast.deinit(allocator) catch unreachable;
 
                         if (fn_args.len == 0) {
-                            s = ast;
+                            s.deinit(allocator) catch unreachable;
+                            s = ast.clone(allocator);
                             env.deinit(allocator);
                             env = f.getEnv();
                             continue;
-                            //return eval(allocator, &ast, f.getEnv());
                         }
 
                         const args = new_list.list.getItems()[1..];
@@ -239,6 +246,7 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                         }
 
                         var fn_env = Env.initWithParent(allocator, f.getEnv());
+                        defer fn_env.deinit(allocator);
 
                         for (fn_args, args) |arg_name, *arg_value| {
                             const ret = fn_env.set(allocator, arg_name, arg_value);
@@ -247,11 +255,12 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                                 else => {},
                             }
                         }
-                        s = ast;
+
+                        s.deinit(allocator) catch unreachable;
+                        s = ast.clone(allocator);
                         env.deinit(allocator);
-                        env = fn_env;
+                        env = fn_env.clone();
                         continue;
-                        //return eval(allocator, &ast, fn_env);
                     },
                     .err => {
                         defer new_list.deinit(allocator) catch unreachable;

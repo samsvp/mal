@@ -160,8 +160,7 @@ pub const Env = struct {
         }
 
         if (self.parent) |_| {
-            // don't deinit root env
-            deinitForce(self, allocator);
+            self.deinitForce(allocator);
         }
     }
 
