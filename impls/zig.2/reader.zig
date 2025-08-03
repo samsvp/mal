@@ -279,6 +279,18 @@ fn readDict(allocator: std.mem.Allocator, reader: *Reader) ParserError!MalType {
     return ParserError.EOFCollectionReadError;
 }
 
+fn translate(allocator: std.mem.Allocator, reader: *Reader, name: []const u8) ParserError!MalType {
+    var deref = try MalType.String.initSymbol(allocator, name);
+    defer deref.deinit(allocator) catch unreachable;
+
+    _ = reader.next();
+    var next = try readForm(allocator, reader);
+    defer next.deinit(allocator) catch unreachable;
+
+    var lst = [_]MalType{ deref, next };
+    return MalType.Array.initList(allocator, &lst);
+}
+
 fn readForm(allocator: std.mem.Allocator, reader: *Reader) !MalType {
     const maybe_token = reader.peek();
     if (maybe_token == null) {
@@ -294,16 +306,15 @@ fn readForm(allocator: std.mem.Allocator, reader: *Reader) !MalType {
         '(' => try readCollection(allocator, reader, .list),
         '[' => try readCollection(allocator, reader, .vector),
         '{' => try readDict(allocator, reader),
-        '@' => {
-            var deref = try MalType.String.initFrom(allocator, "deref");
-            defer deref.deinit(allocator) catch unreachable;
-
-            _ = reader.next();
-            var next = try readForm(allocator, reader);
-            defer next.deinit(allocator) catch unreachable;
-
-            var lst = [_]MalType{ .{ .symbol = deref.string }, next };
-            return MalType.Array.initList(allocator, &lst);
+        '@' => try translate(allocator, reader, "deref"),
+        '\'' => try translate(allocator, reader, "quote"),
+        '`' => try translate(allocator, reader, "quasiquote"),
+        '~' => blk: {
+            if (token.len == 1)
+                break :blk translate(allocator, reader, "unquote");
+            if (token.len == 2 and token[1] == '@')
+                break :blk translate(allocator, reader, "splice-unquote");
+            break :blk try readAtom(allocator, reader);
         },
         else => try readAtom(allocator, reader),
     };

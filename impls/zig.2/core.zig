@@ -454,7 +454,7 @@ pub fn cons(allocator: std.mem.Allocator, args: []MalType) MalType {
     }
 
     const arr = switch (args[1]) {
-        .list => |arr| arr,
+        .list, .vector => |arr| arr,
         else => return MalType.makeError(allocator, "Type error: Deref only works on atoms."),
     };
     return MalType.Array.prepend(allocator, &args[0], arr);
@@ -466,7 +466,11 @@ pub fn concat(allocator: std.mem.Allocator, args: []MalType) MalType {
     }
 
     return switch (args[0]) {
-        .list, .vector => add(allocator, args),
+        .list => add(allocator, args),
+        .vector => blk: {
+            args[0].vector.array_type = .list;
+            break :blk add(allocator, args);
+        },
         else => MalType.makeError(allocator, "Concat only accepts lists/array."),
     };
 }

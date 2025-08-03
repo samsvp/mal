@@ -32,6 +32,16 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
     defer s.deinit(allocator) catch unreachable;
 
     while (true) {
+        const is_eval = env.get("DEBUG-EVAL");
+        if (is_eval) |flag| {
+            switch (flag) {
+                .nil, .err => {},
+                .boolean => |f| if (f)
+                    print_eval(allocator, s),
+                else => print_eval(allocator, s),
+            }
+        }
+
         return switch (s) {
             .symbol => |symbol| if (env.getPtr(symbol.getStr())) |value|
                 value.clone(allocator)

@@ -229,10 +229,7 @@ pub const MalType = union(enum) {
             const new_arr = PageShared(MArray).init(.{ .arr = items_ptr }) catch {
                 return makeError(allocator, "Could not create list, out of memory");
             };
-            return switch (self.array_type) {
-                .list => .{ .list = .{ .array = new_arr, .array_type = .list } },
-                .vector => .{ .vector = .{ .array = new_arr, .array_type = .vector } },
-            };
+            return .{ .list = .{ .array = new_arr, .array_type = .list } };
         }
 
         pub fn addMut(self: *Array, allocator: std.mem.Allocator, other: *Array) MalType {
