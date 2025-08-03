@@ -72,6 +72,7 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                                 return MalType.makeError(allocator, "'let*' takes two parameters");
                             }
                             var new_env = Env.initWithParent(allocator, env);
+                            defer new_env.deinit(allocator);
 
                             const arr = switch (items[1]) {
                                 .list, .vector => |arr| blk: {
@@ -113,7 +114,7 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
 
                             swapS(allocator, &s, &items[2]);
                             env.deinit(allocator);
-                            env = new_env;
+                            env = new_env.clone();
                             continue;
                         }
                         if (std.mem.eql(u8, s_chars, "def!")) {

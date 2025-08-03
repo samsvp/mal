@@ -146,13 +146,16 @@ pub const Env = struct {
         return root;
     }
 
+    pub fn isRoot(self: *Env) bool {
+        return self.parent == null;
+    }
+
     pub fn set(self: *Env, allocator: std.mem.Allocator, key: []const u8, val: *MalType) MalType {
-        const key_owned = std.mem.Allocator.dupe(allocator, u8, key) catch {
-            return MalType.makeError(allocator, "Could not copy key, Out of Memory");
-        };
-        self.mapping.put(allocator, key_owned, val.clone(allocator)) catch {
-            return MalType.makeError(allocator, "Could not add to map Out of Memory");
-        };
+        var oom_error = MalType.makeError(allocator, "Could not add to map Out of Memory");
+        defer oom_error.deinit(allocator) catch unreachable;
+
+        const key_owned = std.mem.Allocator.dupe(allocator, u8, key) catch return oom_error.clone(allocator);
+        self.mapping.put(allocator, key_owned, val.clone(allocator)) catch return oom_error.clone(allocator);
         return .nil;
     }
 

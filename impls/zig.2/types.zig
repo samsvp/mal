@@ -63,11 +63,12 @@ pub const MalType = union(enum) {
                 }
             }
 
+            const env = if (root.isRoot()) root else root.clone();
             // if the env has a parent, then clone the environment. This is done to avoid cyclic dependency.
             const m_fn = PageShared(Fn_).init(Fn_{
                 .ast = ast.clone(allocator),
                 .args = args_owned,
-                .env = root.clone(),
+                .env = env,
             }) catch {
                 deinitArgs(allocator, args_owned);
                 return makeError(allocator, "Failed to create function, out of memory");
