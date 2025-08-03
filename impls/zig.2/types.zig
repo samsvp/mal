@@ -245,6 +245,10 @@ pub const MalType = union(enum) {
             return .{ .string = .{ .chars = try SString.init(chars) } };
         }
 
+        pub fn addChars(self: *String, allocator: std.mem.Allocator, s: []const u8) !void {
+            try self.chars.getPtr().appendSlice(allocator, s);
+        }
+
         /// Add s to self
         pub fn addMut(self: *String, allocator: std.mem.Allocator, s: String) !void {
             try self.chars.getPtr().appendSlice(allocator, s.getStr());

@@ -324,6 +324,25 @@ pub fn count(allocator: std.mem.Allocator, args: []MalType) MalType {
     };
 }
 
+pub fn str(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len == 0) {
+        return MalType.String.initFrom(allocator, "") catch unreachable;
+    }
+
+    var acc = MalType.String.initFrom(allocator, "") catch return MalType.makeError(allocator, "Could not init string");
+    for (args) |arg| {
+        const s = switch (arg) {
+            .string => |s| s.getStr(),
+            else => arg.toString(allocator) catch unreachable,
+        };
+        acc.string.addChars(allocator, s) catch {
+            acc.deinit(allocator) catch unreachable;
+            return MalType.makeError(allocator, "Could not add strings, OOM");
+        };
+    }
+    return acc;
+}
+
 pub fn prn(allocator: std.mem.Allocator, args: []MalType) MalType {
     if (args.len != 1) {
         return MalType.makeError(allocator, "Only accepts one argument");

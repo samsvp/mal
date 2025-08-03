@@ -19,20 +19,11 @@ fn print_eval(allocator: std.mem.Allocator, s: MalType) void {
 fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
     const swapS = struct {
         pub fn swap(a: std.mem.Allocator, s1: *MalType, s2: *MalType) void {
+            const s = s2.clone(a);
             s1.deinit(a) catch unreachable;
-            s1.* = s2.clone(a);
+            s1.* = s;
         }
     }.swap;
-
-    const is_eval = og_env.get("DEBUG-EVAL");
-    if (is_eval) |flag| {
-        switch (flag) {
-            .nil, .err => {},
-            .boolean => |f| if (f)
-                print_eval(allocator, og_s.*),
-            else => print_eval(allocator, og_s.*),
-        }
-    }
 
     var env = og_env.clone();
     defer env.deinit(allocator);
@@ -329,19 +320,24 @@ fn print(allocator: std.mem.Allocator, s: MalType) []const u8 {
     return s.toString(allocator) catch "Could not build string.";
 }
 
-fn rep(allocator: std.mem.Allocator, s: []const u8, env: *Env) ![]const u8 {
+fn re(allocator: std.mem.Allocator, s: []const u8, env: *Env) !MalType {
     var val = try read(
         allocator,
         s,
     );
     defer val.deinit(allocator) catch {};
 
-    var ret = eval(
+    return eval(
         allocator,
         &val,
         env,
     );
-    defer ret.deinit(allocator) catch {};
+}
+
+fn rep(allocator: std.mem.Allocator, s: []const u8, env: *Env) ![]const u8 {
+    var ret = try re(allocator, s, env);
+    defer ret.deinit(allocator) catch unreachable;
+
     return print(
         allocator,
         ret,
@@ -361,6 +357,13 @@ pub fn main() !void {
 
     var env = try Env.initRoot(allocator);
     defer env.deinitForce(allocator);
+
+    const load_file =
+        \\(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) " nil)")))))
+    ;
+    const resp = try rep(allocator, load_file, env);
+    try stdout.print("{s}\n", .{resp});
+    defer allocator.free(resp);
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();

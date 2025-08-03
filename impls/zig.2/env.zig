@@ -104,6 +104,11 @@ pub const Env = struct {
         );
         try env.mapping.put(
             allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "str"),
+            .{ .builtin = core.str },
+        );
+        try env.mapping.put(
+            allocator,
             try std.mem.Allocator.dupe(allocator, u8, "prn"),
             .{ .builtin = core.prn },
         );
