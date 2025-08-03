@@ -122,6 +122,26 @@ pub const Env = struct {
             try std.mem.Allocator.dupe(allocator, u8, "slurp"),
             .{ .builtin = core.slurp },
         );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "atom"),
+            .{ .builtin = core.atom },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "atom?"),
+            .{ .builtin = core.atomQuestion },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "deref"),
+            .{ .builtin = core.deref },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "reset!"),
+            .{ .builtin = core.resetBang },
+        );
         return env;
     }
 

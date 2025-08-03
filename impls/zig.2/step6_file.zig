@@ -45,6 +45,38 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                 switch (list.getItems()[0]) {
                     .symbol => |symbol| {
                         const s_chars = symbol.getStr();
+                        if (std.mem.eql(u8, s_chars, "swap!")) {
+                            const items = list.getItems();
+                            if (items.len < 3) {
+                                return MalType.makeError(allocator, "'swap!' takes at least two parameters");
+                            }
+
+                            var fst = eval(allocator, &items[1], env);
+                            defer fst.deinit(allocator) catch unreachable;
+
+                            var atom = switch (fst) {
+                                .atom => |a| a,
+                                else => return MalType.makeError(allocator, "First argument must be an atom"),
+                            };
+
+                            var snd = eval(allocator, &items[2], env);
+                            defer snd.deinit(allocator) catch unreachable;
+
+                            switch (snd) {
+                                .function, .builtin => {},
+                                else => return MalType.makeError(allocator, "Second parameter must be function"),
+                            }
+
+                            var arr = [_]MalType{ snd, atom.get() };
+                            var new_arr = MalType.Array.initList(allocator, &arr) catch
+                                return MalType.makeError(allocator, "Could not initialize new list, OOM");
+                            defer new_arr.deinit(allocator) catch unreachable;
+
+                            _ = new_arr.list.addMutSlice(allocator, items[3..]);
+
+                            var res = eval(allocator, &new_arr, env);
+                            return atom.reset(allocator, &res);
+                        }
                         if (std.mem.eql(u8, s_chars, "eval")) {
                             const items = list.getItems();
                             if (items.len != 2) {

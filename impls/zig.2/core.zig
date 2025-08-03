@@ -394,3 +394,46 @@ pub fn slurp(allocator: std.mem.Allocator, args: []MalType) MalType {
         .{err},
     );
 }
+
+pub fn atom(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len != 1) {
+        return MalType.makeError(allocator, "Only accepts one argument");
+    }
+
+    return MalType.Atom.init(allocator, args[0]);
+}
+
+pub fn atomQuestion(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len != 1) {
+        return MalType.makeError(allocator, "Only accepts one argument");
+    }
+
+    return switch (args[0]) {
+        .atom => .{ .boolean = true },
+        else => .{ .boolean = false },
+    };
+}
+
+pub fn deref(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len != 1) {
+        return MalType.makeError(allocator, "Only accepts one argument");
+    }
+
+    return switch (args[0]) {
+        .atom => |a| a.get(),
+        else => MalType.makeError(allocator, "Type error: Deref only works on atoms."),
+    };
+}
+
+pub fn resetBang(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len != 2) {
+        return MalType.makeError(allocator, "Only accepts two arguments");
+    }
+
+    var a = switch (args[0]) {
+        .atom => |a| a,
+        else => return MalType.makeError(allocator, "Type error: Deref only works on atoms."),
+    };
+    var val = args[1];
+    return a.reset(allocator, &val);
+}

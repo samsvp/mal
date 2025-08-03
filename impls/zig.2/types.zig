@@ -18,7 +18,45 @@ pub const MalType = union(enum) {
     err: String,
     dict: Dict,
     function: Fn,
+    atom: Atom,
     builtin: *const fn (allocator: std.mem.Allocator, args: []MalType) MalType,
+
+    pub const Atom = struct {
+        value: PageShared(MalType_),
+
+        const MalType_ = struct {
+            value: MalType,
+
+            pub fn deinit(self: *MalType_, allocator: std.mem.Allocator) void {
+                self.value.deinit(allocator) catch unreachable;
+            }
+        };
+
+        pub fn init(allocator: std.mem.Allocator, val: MalType) MalType {
+            const value_ = MalType_{ .value = val };
+            const value = PageShared(MalType_).init(value_) catch return MalType.makeError(allocator, "OOM");
+            return .{ .atom = .{ .value = value } };
+        }
+
+        pub fn deinit(self: *Atom, allocator: std.mem.Allocator) !void {
+            try self.value.deinit(allocator);
+        }
+
+        pub fn reset(self: *Atom, allocator: std.mem.Allocator, val: *MalType) MalType {
+            const new_value = val.clone(allocator);
+            self.value.getPtr().value.deinit(allocator) catch return makeError(allocator, "Could not deinit old value");
+            self.value.getPtr().value = new_value;
+            return new_value;
+        }
+
+        pub fn get(self: Atom) MalType {
+            return self.value.get().value;
+        }
+
+        pub fn clone(self: *Atom, _: std.mem.Allocator) SharedError!MalType {
+            return .{ .atom = .{ .value = try self.value.clone() } };
+        }
+    };
 
     /// A basic type to define user made functions
     pub const Fn = struct {
@@ -201,6 +239,17 @@ pub const MalType = union(enum) {
             return .nil;
         }
 
+        pub fn addMutSlice(self: *Array, allocator: std.mem.Allocator, other: []MalType) MalType {
+            var arr = self.array.getPtr().arr;
+            arr.ensureUnusedCapacity(allocator, other.len) catch {
+                return makeError(allocator, "Can not add arrays, Out of Memory");
+            };
+            for (other) |*item| {
+                arr.appendAssumeCapacity(item.clone(allocator));
+            }
+            return .nil;
+        }
+
         pub fn getItems(self: Array) []MalType {
             return self.array.get().arr.items;
         }
@@ -355,6 +404,11 @@ pub const MalType = union(enum) {
         return .{ .err = err_msg.string };
     }
 
+    pub fn clonePtr(self: *MalType, allocator: std.mem.Allocator) *MalType {
+        _ = self.clone(allocator);
+        return self;
+    }
+
     pub fn clone(self: *MalType, allocator: std.mem.Allocator) MalType {
         return switch (self.*) {
             inline MalType.string,
@@ -362,6 +416,7 @@ pub const MalType = union(enum) {
             MalType.list,
             MalType.dict,
             MalType.function,
+            MalType.atom,
             => |*s| s.clone(allocator) catch .nil,
             MalType.err => |*s| {
                 const str = s.clone(allocator) catch {
@@ -454,6 +509,10 @@ pub const MalType = union(enum) {
                 },
                 else => false,
             },
+            .atom => |a1| switch (b) {
+                .atom => |a2| a1.get().eql(a2.get()),
+                else => false,
+            },
             .nil => switch (b) {
                 .nil => true,
                 else => false,
@@ -473,6 +532,11 @@ pub const MalType = union(enum) {
             .symbol, .keyword => |s| try buffer.appendSlice(s.getStr()),
             .string => |s| try std.fmt.format(buffer.writer(), "\"{s}\"", .{s.getStr()}),
             .err => |s| try std.fmt.format(buffer.writer(), "ERROR: {s}", .{s.getStr()}),
+            .atom => |a| {
+                try buffer.appendSlice("(atom ");
+                try a.get().toStringInternal(buffer);
+                try buffer.append(')');
+            },
             .nil => try buffer.appendSlice("nil"),
             .list => |l| {
                 try buffer.appendSlice("(");
@@ -523,6 +587,7 @@ pub const MalType = union(enum) {
             MalType.keyword,
             MalType.symbol,
             MalType.function,
+            MalType.atom,
             => |*f| {
                 try f.deinit(allocator);
             },
