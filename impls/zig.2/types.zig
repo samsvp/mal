@@ -282,6 +282,12 @@ pub const MalType = union(enum) {
             return .{ .string = .{ .chars = try SString.init(chars) } };
         }
 
+        pub fn initSymbol(allocator: std.mem.Allocator, str: []const u8) !MalType {
+            var chars = try std.ArrayListUnmanaged(u8).initCapacity(allocator, str.len);
+            chars.appendSliceAssumeCapacity(str);
+            return .{ .symbol = .{ .chars = try SString.init(chars) } };
+        }
+
         pub fn getStr(self: String) []const u8 {
             return self.chars.get().items;
         }

@@ -435,5 +435,8 @@ pub fn resetBang(allocator: std.mem.Allocator, args: []MalType) MalType {
         else => return MalType.makeError(allocator, "Type error: Deref only works on atoms."),
     };
     var val = args[1];
-    return a.reset(allocator, &val);
+    return switch (val) {
+        .err => val.clone(allocator),
+        else => a.reset(allocator, &val),
+    };
 }
