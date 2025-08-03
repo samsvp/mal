@@ -294,6 +294,17 @@ fn readForm(allocator: std.mem.Allocator, reader: *Reader) !MalType {
         '(' => try readCollection(allocator, reader, .list),
         '[' => try readCollection(allocator, reader, .vector),
         '{' => try readDict(allocator, reader),
+        '@' => {
+            var deref = try MalType.String.initFrom(allocator, "deref");
+            defer deref.deinit(allocator) catch unreachable;
+
+            _ = reader.next();
+            var next = try readForm(allocator, reader);
+            defer next.deinit(allocator) catch unreachable;
+
+            var lst = [_]MalType{ .{ .symbol = deref.string }, next };
+            return MalType.Array.initList(allocator, &lst);
+        },
         else => try readAtom(allocator, reader),
     };
 }
