@@ -55,6 +55,10 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                             defer expr.deinit(allocator) catch unreachable;
 
                             swapS(allocator, &s, &expr);
+                            var old_env = env;
+                            defer old_env.deinit(allocator);
+
+                            env = env.getRoot();
                             continue;
                         }
                         if (std.mem.eql(u8, s_chars, "let*")) {
@@ -361,9 +365,7 @@ pub fn main() !void {
     const load_file =
         \\(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) " nil)")))))
     ;
-    const resp = try rep(allocator, load_file, env);
-    try stdout.print("{s}\n", .{resp});
-    defer allocator.free(resp);
+    allocator.free(try rep(allocator, load_file, env));
 
     var ln = Linenoise.init(allocator);
     defer ln.deinit();
