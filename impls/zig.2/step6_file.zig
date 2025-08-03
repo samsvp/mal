@@ -54,11 +54,8 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                             var expr = eval(allocator, &items[1], env);
                             defer expr.deinit(allocator) catch unreachable;
 
-                            swapS(allocator, &s, &expr);
-                            var old_env = env;
-                            defer old_env.deinit(allocator);
-
-                            env = env.getRoot();
+                            var res = eval(allocator, &expr, env.getRoot());
+                            swapS(allocator, &s, &res);
                             continue;
                         }
                         if (std.mem.eql(u8, s_chars, "let*")) {
