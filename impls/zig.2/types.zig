@@ -212,19 +212,26 @@ pub const MalType = union(enum) {
             return .nil;
         }
 
-        pub fn add(self: *Array, allocator: std.mem.Allocator, other: *Array) MalType {
-            var items: MArray = .initCapacity(allocator, self.getItems().len + other.getItems().len);
+        pub fn prepend(allocator: std.mem.Allocator, item: *MalType, self: Array) MalType {
+            var items = std.ArrayListUnmanaged(MalType).initCapacity(allocator, self.getItems().len + 1) catch {
+                return makeError(allocator, "OOM");
+            };
 
-            for (self.getItems()) |*item| {
-                items.appendAssumeCapacity(allocator, item.clone(allocator));
-            }
-            for (other.getItems()) |*item| {
-                items.appendAssumeCapacity(item.clone(allocator));
+            items.appendAssumeCapacity(item.clone(allocator));
+            for (self.getItems()) |*mitem| {
+                items.appendAssumeCapacity(mitem.clone(allocator));
             }
 
+            const items_ptr = allocator.create(std.ArrayListUnmanaged(MalType)) catch {
+                return makeError(allocator, "Could not create list, out of memory");
+            };
+            items_ptr.* = items;
+            const new_arr = PageShared(MArray).init(.{ .arr = items_ptr }) catch {
+                return makeError(allocator, "Could not create list, out of memory");
+            };
             return switch (self.array_type) {
-                .list => .{ .list = items },
-                .vector => .{ .vector = items },
+                .list => .{ .list = .{ .array = new_arr, .array_type = .list } },
+                .vector => .{ .vector = .{ .array = new_arr, .array_type = .vector } },
             };
         }
 

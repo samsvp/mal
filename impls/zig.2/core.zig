@@ -129,10 +129,17 @@ pub fn add(allocator: std.mem.Allocator, args: []MalType) MalType {
             return acc;
         },
         .list, .vector => |*arr| {
-            var acc = arr.clone(allocator) catch {
-                return MalType.makeError(allocator, "Could not create new array");
+            var acc = switch (arr.array_type) {
+                .list => MalType.Array.emptyList(allocator),
+                .vector => MalType.Array.emptyVector(allocator),
             };
-            for (args[1..]) |*arg| {
+
+            switch (acc) {
+                .err => return acc,
+                else => {},
+            }
+
+            for (args) |*arg| {
                 switch (arg.*) {
                     .list, .vector => |*vs| {
                         const ret = switch (acc) {
@@ -438,5 +445,28 @@ pub fn resetBang(allocator: std.mem.Allocator, args: []MalType) MalType {
     return switch (val) {
         .err => val.clone(allocator),
         else => a.reset(allocator, &val),
+    };
+}
+
+pub fn cons(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len != 2) {
+        return MalType.makeError(allocator, "Only accepts two arguments");
+    }
+
+    const arr = switch (args[1]) {
+        .list => |arr| arr,
+        else => return MalType.makeError(allocator, "Type error: Deref only works on atoms."),
+    };
+    return MalType.Array.prepend(allocator, &args[0], arr);
+}
+
+pub fn concat(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len == 0) {
+        return MalType.Array.emptyList(allocator);
+    }
+
+    return switch (args[0]) {
+        .list, .vector => add(allocator, args),
+        else => MalType.makeError(allocator, "Concat only accepts lists/array."),
     };
 }

@@ -142,6 +142,16 @@ pub const Env = struct {
             try std.mem.Allocator.dupe(allocator, u8, "reset!"),
             .{ .builtin = core.resetBang },
         );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "cons"),
+            .{ .builtin = core.cons },
+        );
+        try env.mapping.put(
+            allocator,
+            try std.mem.Allocator.dupe(allocator, u8, "concat"),
+            .{ .builtin = core.concat },
+        );
         return env;
     }
 
