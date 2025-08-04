@@ -279,6 +279,7 @@ fn readDict(allocator: std.mem.Allocator, reader: *Reader) ParserError!MalType {
     return ParserError.EOFCollectionReadError;
 }
 
+// we have a leak here
 fn translate(allocator: std.mem.Allocator, reader: *Reader, name: []const u8) ParserError!MalType {
     var deref = try MalType.String.initSymbol(allocator, name);
     defer deref.deinit(allocator) catch unreachable;

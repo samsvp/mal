@@ -19,67 +19,59 @@ fn print_eval(allocator: std.mem.Allocator, s: MalType) void {
 fn quasiquote(allocator: std.mem.Allocator, ast: *MalType, env: *Env) MalType {
     const isSpliceUnquote = struct {
         pub fn f(elt: MalType) bool {
-            switch (elt) {
-                .list => |arr| {
-                    const items = arr.getItems();
-                    if (items.len > 0) switch (items[0]) {
-                        .symbol => |sym| return (std.mem.eql(u8, sym.getStr(), "splice-unquote")),
-                        else => {},
-                    };
-                    return false;
-                },
-                else => return false,
+            if (elt != .list) {
+                return false;
             }
+
+            const arr = elt.list;
+            const items = arr.getItems();
+            return items.len > 0 and
+                items[0] == .symbol and
+                std.mem.eql(u8, items[0].symbol.getStr(), "splice-unquote");
         }
     }.f;
 
-    switch (ast.*) {
-        .list => |args_arr| {
-            const args = args_arr.getItems();
-            if (args.len == 2) {
-                switch (args[0]) {
-                    .symbol => |sym| {
-                        if (std.mem.eql(u8, sym.getStr(), "unquote")) {
-                            return eval(allocator, &args[1], env);
-                        }
-                    },
-                    else => {},
-                }
-            }
-
-            var res_arr = std.ArrayListUnmanaged(MalType).initCapacity(allocator, args.len) catch unreachable;
-            defer {
-                for (res_arr.items) |*v| {
-                    v.deinit(allocator) catch unreachable;
-                }
-                res_arr.deinit(allocator);
-            }
-            for (args) |*elt| {
-                if (isSpliceUnquote(elt.*)) {
-                    const items = elt.list.getItems();
-                    if (items.len != 2) return MalType.makeError(allocator, "splice-unquote taks only one argument.");
-
-                    var lst = eval(allocator, &items[1], env);
-                    defer lst.deinit(allocator) catch unreachable;
-
-                    switch (lst) {
-                        .list => |xs| {
-                            for (xs.getItems()) |*x| {
-                                res_arr.append(allocator, x.clone(allocator)) catch unreachable;
-                            }
-                        },
-                        else => return MalType.makeError(allocator, "splice-unquote argument must be a list"),
-                    }
-                } else {
-                    const res = quasiquote(allocator, elt, env);
-                    res_arr.append(allocator, res) catch unreachable;
-                }
-            }
-
-            return MalType.Array.initList(allocator, res_arr.items) catch return MalType.makeError(allocator, "OOM");
-        },
-        else => return ast.clone(allocator),
+    if (ast.* != .list) {
+        return ast.clone(allocator);
     }
+
+    const args_arr = ast.list;
+    const args = args_arr.getItems();
+    if (args.len == 2) {
+        if (args[0] == .symbol and std.mem.eql(u8, args[0].symbol.getStr(), "unquote")) {
+            return eval(allocator, &args[1], env);
+        }
+    }
+
+    var res_arr = std.ArrayListUnmanaged(MalType).initCapacity(allocator, args.len) catch unreachable;
+    defer {
+        for (res_arr.items) |*v| {
+            v.deinit(allocator) catch unreachable;
+        }
+        res_arr.deinit(allocator);
+    }
+    for (args) |*elt| {
+        if (!isSpliceUnquote(elt.*)) {
+            const res = quasiquote(allocator, elt, env);
+            res_arr.append(allocator, res) catch unreachable;
+            continue;
+        }
+
+        const items = elt.list.getItems();
+        if (items.len != 2) return MalType.makeError(allocator, "splice-unquote taks only one argument.");
+
+        var lst = eval(allocator, &items[1], env);
+        defer lst.deinit(allocator) catch unreachable;
+
+        if (lst != .list) {
+            return MalType.makeError(allocator, "splice-unquote argument must be a list");
+        }
+        for (lst.list.getItems()) |*x| {
+            res_arr.append(allocator, x.clone(allocator)) catch unreachable;
+        }
+    }
+
+    return MalType.Array.initList(allocator, res_arr.items) catch return MalType.makeError(allocator, "OOM");
 }
 
 fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
@@ -109,212 +101,206 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
         }
 
         return switch (s) {
-            .symbol => |symbol| if (env.getPtr(symbol.getStr())) |value|
-                value.clone(allocator)
-            else
-                MalType.makeErrorF(allocator, "Symbol {s} not found.", .{symbol.getStr()}),
+            .symbol => |symbol| {
+                return if (env.getPtr(symbol.getStr())) |value|
+                    value.clone(allocator)
+                else
+                    MalType.makeErrorF(allocator, "Symbol {s} not found.", .{symbol.getStr()});
+            },
             .list => |*list| {
                 if (list.getItems().len == 0) {
                     return s.clone(allocator);
                 }
 
-                switch (list.getItems()[0]) {
-                    .symbol => |symbol| {
-                        const s_chars = symbol.getStr();
-                        if (std.mem.eql(u8, s_chars, "quote")) {
-                            if (list.getItems().len != 2) {
-                                return MalType.makeError(allocator, "Only accepts one argument");
-                            }
-
-                            const args = list.getItems()[1..];
-                            return args[0].clone(allocator);
+                const items = list.getItems();
+                if (items[0] == .symbol) {
+                    const symbol = items[0].symbol;
+                    const s_chars = symbol.getStr();
+                    if (std.mem.eql(u8, s_chars, "quote")) {
+                        if (list.getItems().len != 2) {
+                            return MalType.makeError(allocator, "Only accepts one argument");
                         }
-                        if (std.mem.eql(u8, s_chars, "quasiquote")) {
-                            if (list.getItems().len != 2) {
-                                return MalType.makeError(allocator, "Only accepts one argument");
-                            }
 
-                            const ast = list.getItems()[1..];
-                            return quasiquote(allocator, &ast[0], env);
+                        const args = list.getItems()[1..];
+                        return args[0].clone(allocator);
+                    }
+                    if (std.mem.eql(u8, s_chars, "quasiquote")) {
+                        if (list.getItems().len != 2) {
+                            return MalType.makeError(allocator, "Only accepts one argument");
                         }
-                        if (std.mem.eql(u8, s_chars, "swap!")) {
-                            const items = list.getItems();
-                            if (items.len < 3) {
-                                return MalType.makeError(allocator, "'swap!' takes at least two parameters");
-                            }
 
-                            var fst = eval(allocator, &items[1], env);
-                            defer fst.deinit(allocator) catch unreachable;
-
-                            var atom = switch (fst) {
-                                .atom => |a| a,
-                                else => return MalType.makeError(allocator, "First argument must be an atom"),
-                            };
-
-                            var snd = eval(allocator, &items[2], env);
-                            defer snd.deinit(allocator) catch unreachable;
-
-                            switch (snd) {
-                                .function, .builtin => {},
-                                else => return MalType.makeError(allocator, "Second parameter must be function"),
-                            }
-
-                            var arr = [_]MalType{ snd, atom.get() };
-                            var new_arr = MalType.Array.initList(allocator, &arr) catch
-                                return MalType.makeError(allocator, "Could not initialize new list, OOM");
-                            defer new_arr.deinit(allocator) catch unreachable;
-
-                            _ = new_arr.list.addMutSlice(allocator, items[3..]);
-
-                            var res = eval(allocator, &new_arr, env);
-                            return atom.reset(allocator, &res);
+                        const ast = list.getItems()[1..];
+                        return quasiquote(allocator, &ast[0], env);
+                    }
+                    if (std.mem.eql(u8, s_chars, "swap!")) {
+                        if (items.len < 3) {
+                            return MalType.makeError(allocator, "'swap!' takes at least two parameters");
                         }
-                        if (std.mem.eql(u8, s_chars, "eval")) {
-                            const items = list.getItems();
-                            if (items.len != 2) {
-                                return MalType.makeError(allocator, "'eval' takes one parameter");
-                            }
 
-                            var expr = eval(allocator, &items[1], env);
-                            defer expr.deinit(allocator) catch unreachable;
+                        var fst = eval(allocator, &items[1], env);
+                        defer fst.deinit(allocator) catch unreachable;
 
-                            var res = eval(allocator, &expr, env.getRoot());
-                            swapS(allocator, &s, &res);
-                            continue;
+                        var atom = switch (fst) {
+                            .atom => |a| a,
+                            else => return MalType.makeError(allocator, "First argument must be an atom"),
+                        };
+
+                        var snd = eval(allocator, &items[2], env);
+                        defer snd.deinit(allocator) catch unreachable;
+
+                        switch (snd) {
+                            .function, .builtin => {},
+                            else => return MalType.makeError(allocator, "Second parameter must be function"),
                         }
-                        if (std.mem.eql(u8, s_chars, "let*")) {
-                            const items = list.getItems();
-                            if (items.len != 3) {
-                                return MalType.makeError(allocator, "'let*' takes two parameters");
-                            }
-                            var new_env = Env.initWithParent(allocator, env);
-                            defer new_env.deinit(allocator);
 
-                            const arr = switch (items[1]) {
-                                .list, .vector => |arr| blk: {
-                                    if (arr.getItems().len % 2 != 0) {
-                                        return MalType.makeError(allocator, "'let*' takes an even number of parameters.");
+                        var arr = [_]MalType{ snd, atom.get() };
+                        var new_arr = MalType.Array.initList(allocator, &arr) catch
+                            return MalType.makeError(allocator, "Could not initialize new list, OOM");
+                        defer new_arr.deinit(allocator) catch unreachable;
+
+                        _ = new_arr.list.addMutSlice(allocator, items[3..]);
+
+                        var res = eval(allocator, &new_arr, env);
+                        return atom.reset(allocator, &res);
+                    }
+                    if (std.mem.eql(u8, s_chars, "eval")) {
+                        if (items.len != 2) {
+                            return MalType.makeError(allocator, "'eval' takes one parameter");
+                        }
+
+                        var expr = eval(allocator, &items[1], env);
+                        defer expr.deinit(allocator) catch unreachable;
+
+                        var res = eval(allocator, &expr, env.getRoot());
+                        swapS(allocator, &s, &res);
+                        continue;
+                    }
+                    if (std.mem.eql(u8, s_chars, "let*")) {
+                        if (items.len != 3) {
+                            return MalType.makeError(allocator, "'let*' takes two parameters");
+                        }
+                        var new_env = Env.initWithParent(allocator, env);
+                        defer new_env.deinit(allocator);
+
+                        const arr = switch (items[1]) {
+                            .list, .vector => |arr| blk: {
+                                if (arr.getItems().len % 2 != 0) {
+                                    return MalType.makeError(allocator, "'let*' takes an even number of parameters.");
+                                }
+                                break :blk arr;
+                            },
+                            else => return MalType.makeError(allocator, "Second element of 'let*' must be a list or vector."),
+                        };
+
+                        const args_items = arr.getItems();
+                        for (0..args_items.len / 2) |_i| {
+                            const i = 2 * _i;
+
+                            var arg_env = Env.initWithParent(allocator, new_env);
+                            defer arg_env.deinit(allocator);
+
+                            const key = args_items[i];
+
+                            var value = eval(allocator, &args_items[i + 1], arg_env);
+                            defer value.deinit(allocator) catch {};
+
+                            switch (key) {
+                                .symbol => |new_symbol| {
+                                    switch (value) {
+                                        .err => return value.clone(allocator),
+                                        else => {},
                                     }
-                                    break :blk arr;
+                                    var ret = new_env.set(allocator, new_symbol.getStr(), &value);
+                                    switch (ret) {
+                                        .err => return ret.clone(allocator),
+                                        else => {},
+                                    }
                                 },
-                                else => return MalType.makeError(allocator, "Second element of 'let*' must be a list or vector."),
-                            };
-
-                            const args_items = arr.getItems();
-                            for (0..args_items.len / 2) |_i| {
-                                const i = 2 * _i;
-
-                                var arg_env = Env.initWithParent(allocator, new_env);
-                                defer arg_env.deinit(allocator);
-
-                                const key = args_items[i];
-
-                                var value = eval(allocator, &args_items[i + 1], arg_env);
-                                defer value.deinit(allocator) catch {};
-
-                                switch (key) {
-                                    .symbol => |new_symbol| {
-                                        switch (value) {
-                                            .err => return value.clone(allocator),
-                                            else => {},
-                                        }
-                                        var ret = new_env.set(allocator, new_symbol.getStr(), &value);
-                                        switch (ret) {
-                                            .err => return ret.clone(allocator),
-                                            else => {},
-                                        }
-                                    },
-                                    else => return MalType.makeError(allocator, "'let*' key must be symbol."),
-                                }
+                                else => return MalType.makeError(allocator, "'let*' key must be symbol."),
                             }
-
-                            swapS(allocator, &s, &items[2]);
-                            env.deinit(allocator);
-                            env = new_env.clone();
-                            continue;
                         }
-                        if (std.mem.eql(u8, s_chars, "def!")) {
-                            const items = list.getItems();
-                            if (items.len != 3) {
-                                return MalType.makeError(allocator, "'def!' takes two parametes");
-                            }
 
-                            switch (items[1]) {
-                                .symbol => {},
-                                else => return MalType.makeError(allocator, "Second parameter of 'def!' must be a symbol"),
-                            }
-
-                            var val = eval(allocator, &items[2], env);
-                            defer val.deinit(allocator) catch {};
-                            switch (val) {
-                                .err => return val.clone(allocator),
-                                else => {},
-                            }
-                            const ret = env.getRoot().set(allocator, items[1].symbol.getStr(), &val);
-                            switch (ret) {
-                                .err => return ret,
-                                else => {},
-                            }
-                            return val.clone(allocator);
+                        swapS(allocator, &s, &items[2]);
+                        env.deinit(allocator);
+                        env = new_env.clone();
+                        continue;
+                    }
+                    if (std.mem.eql(u8, s_chars, "def!")) {
+                        if (items.len != 3) {
+                            return MalType.makeError(allocator, "'def!' takes two parametes");
                         }
-                        if (std.mem.eql(u8, s_chars, "do")) {
-                            const items = list.getItems();
-                            if (items.len == 1) {
-                                return .nil;
-                            }
 
-                            var res: MalType = .nil;
-                            for (items[1 .. items.len - 1]) |*item| {
-                                var res_eval = eval(allocator, item, env);
-                                defer res_eval.deinit(allocator) catch {};
-
-                                res.deinit(allocator) catch {};
-                                switch (res_eval) {
-                                    .err => return res_eval.clone(allocator),
-                                    else => res = res_eval.clone(allocator),
-                                }
-                            }
-                            swapS(allocator, &s, &items[items.len - 1]);
-                            continue;
+                        switch (items[1]) {
+                            .symbol => {},
+                            else => return MalType.makeError(allocator, "Second parameter of 'def!' must be a symbol"),
                         }
-                        if (std.mem.eql(u8, s_chars, "if")) {
-                            const items = list.getItems();
-                            if (items.len != 3 and items.len != 4) {
-                                return MalType.makeError(allocator, "'if' takes only 1 or 2 parameters");
-                            }
 
-                            var cond = eval(allocator, &items[1], env);
-                            defer cond.deinit(allocator) catch unreachable;
-                            switch (cond) {
-                                .err => return cond.clone(allocator),
-                                .nil => if (items.len == 3) return .nil else swapS(allocator, &s, &items[3]),
-                                .boolean => |b| if (b)
-                                    swapS(allocator, &s, &items[2])
-                                else if (items.len == 3)
-                                    return .nil
-                                else
-                                    swapS(allocator, &s, &items[3]),
-
-                                else => swapS(allocator, &s, &items[2]),
-                            }
-                            continue;
+                        var val = eval(allocator, &items[2], env);
+                        defer val.deinit(allocator) catch {};
+                        switch (val) {
+                            .err => return val.clone(allocator),
+                            else => {},
                         }
-                        if (std.mem.eql(u8, s_chars, "fn*")) {
-                            const items = list.getItems();
-                            if (items.len != 3) {
-                                return MalType.makeError(allocator, "'fn*' takes only 2 parameters, function arguments and body.");
-                            }
-
-                            const args = switch (items[1]) {
-                                .vector, .list => |arr| arr.getItems(),
-                                else => return MalType.makeError(allocator, "'fn*' arguments must be inside a list"),
-                            };
-
-                            const ast = &items[2];
-                            return MalType.Fn.init(allocator, ast, args, env);
+                        const ret = env.getRoot().set(allocator, items[1].symbol.getStr(), &val);
+                        switch (ret) {
+                            .err => return ret,
+                            else => {},
                         }
-                    },
-                    else => {},
+                        return val.clone(allocator);
+                    }
+                    if (std.mem.eql(u8, s_chars, "do")) {
+                        if (items.len == 1) {
+                            return .nil;
+                        }
+
+                        var res: MalType = .nil;
+                        for (items[1 .. items.len - 1]) |*item| {
+                            var res_eval = eval(allocator, item, env);
+                            defer res_eval.deinit(allocator) catch {};
+
+                            res.deinit(allocator) catch {};
+                            switch (res_eval) {
+                                .err => return res_eval.clone(allocator),
+                                else => res = res_eval.clone(allocator),
+                            }
+                        }
+                        swapS(allocator, &s, &items[items.len - 1]);
+                        continue;
+                    }
+                    if (std.mem.eql(u8, s_chars, "if")) {
+                        if (items.len != 3 and items.len != 4) {
+                            return MalType.makeError(allocator, "'if' takes only 1 or 2 parameters");
+                        }
+
+                        var cond = eval(allocator, &items[1], env);
+                        defer cond.deinit(allocator) catch unreachable;
+                        switch (cond) {
+                            .err => return cond.clone(allocator),
+                            .nil => if (items.len == 3) return .nil else swapS(allocator, &s, &items[3]),
+                            .boolean => |b| if (b)
+                                swapS(allocator, &s, &items[2])
+                            else if (items.len == 3)
+                                return .nil
+                            else
+                                swapS(allocator, &s, &items[3]),
+
+                            else => swapS(allocator, &s, &items[2]),
+                        }
+                        continue;
+                    }
+                    if (std.mem.eql(u8, s_chars, "fn*")) {
+                        if (items.len != 3) {
+                            return MalType.makeError(allocator, "'fn*' takes only 2 parameters, function arguments and body.");
+                        }
+
+                        const args = switch (items[1]) {
+                            .vector, .list => |arr| arr.getItems(),
+                            else => return MalType.makeError(allocator, "'fn*' arguments must be inside a list"),
+                        };
+
+                        const ast = &items[2];
+                        return MalType.Fn.init(allocator, ast, args, env);
+                    }
                 }
 
                 var new_list = MalType.Array.emptyList(allocator);
