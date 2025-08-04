@@ -91,41 +91,35 @@ pub fn add(allocator: std.mem.Allocator, args: []MalType) MalType {
     switch (args[0]) {
         .int => |i| {
             var acc: i32 = i;
-            for (args[1..]) |value| {
-                switch (value) {
-                    .int => |i_val| acc += i_val,
-                    else => return MalType.makeError(allocator, "Can only add int to other ints"),
-                }
-            }
+            for (args[1..]) |value| switch (value) {
+                .int => |i_val| acc += i_val,
+                else => return MalType.makeError(allocator, "Can only add int to other ints"),
+            };
             return .{ .int = acc };
         },
         .float => |f| {
             var acc: f32 = f;
-            for (args[1..]) |value| {
-                switch (value) {
-                    .float => |f_val| acc += f_val,
-                    .int => |i_val| acc += @floatFromInt(i_val),
-                    else => return MalType.makeError(allocator, "Can only add float to other floats"),
-                }
-            }
+            for (args[1..]) |value| switch (value) {
+                .float => |f_val| acc += f_val,
+                .int => |i_val| acc += @floatFromInt(i_val),
+                else => return MalType.makeError(allocator, "Can only add float to other floats"),
+            };
             return .{ .float = acc };
         },
         .string => {
             var acc = MalType.String.initFrom(allocator, "") catch return MalType.makeError(allocator, "Could not init string");
-            for (args) |arg| {
-                switch (arg) {
-                    .string => |s| {
-                        acc.string.addMut(allocator, s) catch {
-                            acc.deinit(allocator) catch {};
-                            return MalType.makeError(allocator, "Could not add strings, OOM");
-                        };
-                    },
-                    else => {
+            for (args) |arg| switch (arg) {
+                .string => |s| {
+                    acc.string.addMut(allocator, s) catch {
                         acc.deinit(allocator) catch {};
-                        return MalType.makeError(allocator, "Can only add string to other strings");
-                    },
-                }
-            }
+                        return MalType.makeError(allocator, "Could not add strings, OOM");
+                    };
+                },
+                else => {
+                    acc.deinit(allocator) catch {};
+                    return MalType.makeError(allocator, "Can only add string to other strings");
+                },
+            };
             return acc;
         },
         .list, .vector => |*arr| {
@@ -134,30 +128,26 @@ pub fn add(allocator: std.mem.Allocator, args: []MalType) MalType {
                 .vector => MalType.Array.emptyVector(allocator),
             };
 
-            switch (acc) {
-                .err => return acc,
-                else => {},
+            if (acc == .err) {
+                return acc;
             }
 
-            for (args) |*arg| {
-                switch (arg.*) {
-                    .list, .vector => |*vs| {
-                        const ret = switch (acc) {
-                            .list => |*l| l.addMut(allocator, vs),
-                            .vector => |*v| v.addMut(allocator, vs),
-                            else => unreachable,
-                        };
-                        switch (ret) {
-                            .err => return ret,
-                            else => {},
-                        }
-                    },
-                    else => {
-                        acc.deinit(allocator) catch {};
-                        return MalType.makeError(allocator, "Can only add string to other strings");
-                    },
-                }
-            }
+            for (args) |*arg| switch (arg.*) {
+                .list, .vector => |*vs| {
+                    const ret = switch (acc) {
+                        inline .list, .vector => |*l| l.addMut(allocator, vs),
+                        else => unreachable,
+                    };
+
+                    if (ret == .err) {
+                        return ret;
+                    }
+                },
+                else => {
+                    acc.deinit(allocator) catch {};
+                    return MalType.makeError(allocator, "Can only add lists and vectors to other lists and vectors");
+                },
+            };
             return acc;
         },
         else => return MalType.makeError(allocator, "Can not add type"),
@@ -293,10 +283,7 @@ pub fn listQuestion(allocator: std.mem.Allocator, args: []MalType) MalType {
         return MalType.makeError(allocator, "Only accepts one argument");
     }
 
-    return switch (args[0]) {
-        .list => .{ .boolean = true },
-        else => .{ .boolean = false },
-    };
+    return .{ .boolean = args[0] == .list };
 }
 
 pub fn emptyQuestion(allocator: std.mem.Allocator, args: []MalType) MalType {
@@ -309,8 +296,8 @@ pub fn emptyQuestion(allocator: std.mem.Allocator, args: []MalType) MalType {
     }
 
     return switch (args[0]) {
-        .list, .vector => |arr| if (arr.getItems().len == 0) .{ .boolean = true } else .{ .boolean = false },
-        .dict => |d| if (d.getValues().size == 0) .{ .boolean = true } else .{ .boolean = false },
+        .list, .vector => |arr| .{ .boolean = arr.getItems().len == 0 },
+        .dict => |d| .{ .boolean = d.getValues().size == 0 },
         else => .{ .boolean = false },
     };
 }
