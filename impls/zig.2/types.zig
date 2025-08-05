@@ -66,6 +66,7 @@ pub const MalType = union(enum) {
             ast: MalType,
             args: [][]const u8,
             env: *Env,
+            is_macro: bool = false,
 
             pub fn deinit(self: *Fn_, allocator: std.mem.Allocator) void {
                 self.ast.deinit(allocator) catch unreachable;
@@ -114,6 +115,14 @@ pub const MalType = union(enum) {
 
             const self = Fn{ .shared_fn = m_fn };
             return .{ .function = self };
+        }
+
+        pub fn setMacro(self: *Fn) void {
+            self.shared_fn.getPtr().is_macro = true;
+        }
+
+        pub fn isMacro(self: *Fn) bool {
+            return self.shared_fn.getPtr().is_macro;
         }
 
         pub fn getAst(self: *Fn) *MalType {
@@ -205,6 +214,7 @@ pub const MalType = union(enum) {
             return .{ .vector = .{ .array = new_arr, .array_type = .vector } };
         }
 
+        // value should be a pointer and we should clone
         pub fn append(self: *Array, allocator: std.mem.Allocator, value: MalType) MalType {
             self.array.getPtr().arr.append(allocator, value) catch {
                 return makeError(allocator, "Could not append to collection, OOM");

@@ -13,6 +13,7 @@ commands = {
     5: "step5_tco",
     6: "step6_file",
     7: "step7_quote",
+    8: "step8_macros",
 }
 
 def build(step: int):
