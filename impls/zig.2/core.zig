@@ -338,11 +338,14 @@ pub fn str(allocator: std.mem.Allocator, args: []MalType) MalType {
 }
 
 pub fn prn(allocator: std.mem.Allocator, args: []MalType) MalType {
-    if (args.len != 1) {
-        return MalType.makeError(allocator, "Only accepts one argument");
-    }
+    const stdout = std.io.getStdOut().writer();
 
-    printer.prStr(allocator, args[0], true);
+    for (args) |arg| {
+        const s = arg.toString(allocator) catch unreachable;
+        defer allocator.free(s);
+        stdout.print("{s} ", .{s}) catch {};
+    }
+    stdout.print("\n", .{}) catch {};
     return .nil;
 }
 
@@ -445,6 +448,18 @@ pub fn cons(allocator: std.mem.Allocator, args: []MalType) MalType {
         else => return MalType.makeError(allocator, "Type error: Deref only works on atoms."),
     };
     return MalType.Array.prepend(allocator, &args[0], arr);
+}
+
+pub fn throw(allocator: std.mem.Allocator, args: []MalType) MalType {
+    if (args.len != 1) {
+        return MalType.makeError(allocator, "'throw' accepts one argument");
+    }
+
+    if (args[0] != .string) {
+        return MalType.makeError(allocator, "'throw' accepts only a string argument");
+    }
+
+    return MalType.makeErrorF(allocator, "{s}", .{args[0].string.getStr()});
 }
 
 pub fn concat(allocator: std.mem.Allocator, args: []MalType) MalType {

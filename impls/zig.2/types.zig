@@ -15,6 +15,7 @@ pub const MalType = union(enum) {
     boolean: bool,
     list: Array,
     vector: Array,
+    // error should not be actually a type
     err: String,
     dict: Dict,
     function: Fn,

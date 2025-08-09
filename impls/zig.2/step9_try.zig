@@ -116,6 +116,43 @@ fn eval(allocator: std.mem.Allocator, og_s: *MalType, og_env: *Env) MalType {
                 if (items[0] == .symbol) {
                     const symbol = items[0].symbol;
                     const s_chars = symbol.getStr();
+                    if (std.mem.eql(u8, s_chars, "try*")) {
+                        if (items.len != 3) {
+                            return MalType.makeError(allocator, "'try*' takes one parameter and a catch form.");
+                        }
+
+                        if (items[2] != .list) {
+                            return MalType.makeError(allocator, "Missing 'catch*' form.");
+                        }
+
+                        const catch_form = items[2].list.getItems();
+                        if (catch_form.len != 3) {
+                            return MalType.makeError(allocator, "'catch*' takes two parameters");
+                        }
+
+                        if (catch_form[0] == .symbol) {
+                            if (!std.mem.eql(u8, catch_form[0].symbol.getStr(), "catch*"))
+                                return MalType.makeError(allocator, "Missing 'catch*' keyword in catch form");
+                        } else {
+                            return MalType.makeError(allocator, "Missing 'catch*' keyword in catch form");
+                        }
+
+                        if (catch_form[1] != .symbol) {
+                            return MalType.makeError(allocator, "Missing symbol after 'catch*'");
+                        }
+
+                        var ret = eval(allocator, &items[1], env);
+                        defer ret.deinit(allocator) catch unreachable;
+
+                        if (ret == .err) {
+                            var new_env = Env.initWithParent(allocator, env);
+                            defer new_env.deinit(allocator);
+                            _ = new_env.set(allocator, catch_form[1].symbol.getStr(), &ret);
+
+                            return eval(allocator, &catch_form[2], new_env);
+                        }
+                        return ret.clone(allocator);
+                    }
                     if (std.mem.eql(u8, s_chars, "defmacro!")) {
                         if (items.len != 3) {
                             return MalType.makeError(allocator, "'defmacro!' takes two parametes");
